@@ -7,7 +7,10 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;800&family=IBM+Plex+Mono:wght@500;600&display=swap">
 <style>
   html,body{margin:0;height:100%;background:#1a1914;overflow:hidden;user-select:none;font-family:"IBM Plex Mono",monospace}
-  body{-webkit-app-region:drag}
+  /* Only the rim drags the window. On Windows a drag area wins over anything
+     on top of it, so it must never sit under the radio or the PDA. */
+  body{-webkit-app-region:no-drag}
+  .drag{-webkit-app-region:drag}
   button{-webkit-app-region:no-drag;cursor:pointer}
   .abs{position:absolute;box-sizing:border-box}
   #chassis{border-radius:30px;background:#0b0b09;box-shadow:0 18px 40px rgba(0,0,0,.55),inset 0 0 0 1px #2a271d}
@@ -35,8 +38,9 @@
 <div id="rim" class="abs"></div>
 <span class="screw" id="s1"></span><span class="screw" id="s2"></span><span class="screw" id="s3"></span><span class="screw" id="s4"></span>
 <div id="engrave" class="abs">DAD OPS · FIELD KIT</div>
-<div id="winbtns" class="abs"><button id="min" aria-label="Minimize" title="Minimize">–</button><button id="hide" aria-label="Hide to the tray (stays on net)" title="Hide to the tray (stays on net)">×</button></div>
+<div id="winbtns" class="abs" style="z-index:2"><button id="min" aria-label="Minimize" title="Minimize">–</button><button id="hide" aria-label="Hide to the tray (stays on net)" title="Hide to the tray (stays on net)">×</button></div>
 <div id="screen" class="abs"></div>
+<div id="dragT" class="abs drag"></div><div id="dragB" class="abs drag"></div><div id="dragL" class="abs drag"></div><div id="dragR" class="abs drag"></div>
 <div id="hinge" class="abs" hidden><i></i><button id="fold" class="vbtn" aria-label="Fold the Field PDA away" title="Fold the Field PDA away">◂ FOLD</button><i></i></div>
 <button id="unfold" class="abs vbtn" aria-label="Unfold the Field PDA" title="Unfold the Field PDA" hidden>FIELD PDA ▸</button>
 <div id="status" class="abs" role="status"></div>

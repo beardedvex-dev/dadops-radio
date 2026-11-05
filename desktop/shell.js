@@ -18,6 +18,12 @@ function layout(l) {
   Object.assign($("engrave").style, { left: c.x + 48 + "px", top: c.y + 13 + "px" });
   Object.assign($("winbtns").style, { left: c.x + c.w - 48 - 66 + "px", top: c.y + 7 + "px" });
   put($("screen"), l.screen);
+  // Drag strips on the rim only: between the chassis edge and the screen.
+  const sc = l.screen;
+  put($("dragT"), { x: c.x, y: c.y, w: c.w, h: sc.y - c.y });
+  put($("dragB"), { x: c.x, y: sc.y + sc.h, w: c.w, h: c.y + c.h - (sc.y + sc.h) });
+  put($("dragL"), { x: c.x, y: sc.y, w: sc.x - c.x, h: sc.h });
+  put($("dragR"), { x: sc.x + sc.w, y: sc.y, w: c.x + c.w - (sc.x + sc.w), h: sc.h });
   put($("status"), l.status);
   put($("hinge"), l.hinge);
   put($("unfold"), l.tab);
