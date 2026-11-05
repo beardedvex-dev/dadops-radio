@@ -97,18 +97,26 @@ Each build needs a new version number. Claude bumps it in
   can draw over exclusive Fullscreen. Most games call it "Borderless",
   "Windowed Fullscreen" or "Fullscreen (Windowed)".
 
-## The Field PDA (from v0.2.0)
+## The field kit (from v0.4.0)
 
-Press **F9** anywhere, even in-game, to pop up the **Field PDA**
-(dadops.gg/pda) on top of the game. Press it again to hide it. The radio keeps
-running the whole time, and your talk keys still work while it's open.
+The app is one rugged "field kit" built like the Field PDA. The radio is on
+the left, and the **Field PDA** (dadops.gg/pda) folds out to the right.
 
-- Change the key in the **Desktop app** box → **Show/hide key** → press the
-  new key (Esc cancels). If a net was using that key, the net gives it up.
-- **Open Field PDA** button there, or right-click the tray icon.
-- The PDA window remembers its size and position. Drag it to a second
-  monitor if you have one.
-- The first time, sign in to dadops.gg in the PDA window (same Discord).
+- **Folded:** just the radio. Click the **FIELD PDA ▸** tab sticking out of
+  the right edge to fold the PDA out.
+- **Unfolded:** radio + Field PDA. Click **◂ FOLD** on the hinge to fold it
+  away.
+- **F9 anywhere, even in-game:** pops the whole kit up unfolded, on top of
+  the game. Press F9 again to tuck it away. The radio stays on net the whole
+  time; your talk keys keep working while it's open.
+- **Drag** the kit by its rim. **–** minimizes, **×** hides it to the tray
+  (still on net).
+- Change the F9 key in **Desktop app** (bottom of the radio, click to open)
+  → **Show/hide key**. If a net was using that key, the net gives it up.
+- Closed net cards stay compact. Click **▾** on a joined net to see who's on
+  it and the ear/volume controls; a net with someone talking opens by itself.
+- The first time, sign in to dadops.gg in the PDA side (same Discord).
+- It remembers whether the PDA was folded out, plus its size and position.
 
 ## Updating
 

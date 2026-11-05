@@ -282,6 +282,7 @@ function onDesktopInput(ev) {
 let deskPrefs = {};
 function desktopSetup() {
   document.body.classList.add("desktop");
+  if (DESK.kit) { document.body.classList.add("kit"); document.documentElement.classList.add("kit"); } // v0.4+ app: the field kit look
   $("notice-text").innerHTML = "<b>Desktop app.</b> Your talk keys work while the game is in front. Click a key box on a net to change it (Mouse 4/5 work too).";
   DESK.onInput(onDesktopInput);
   const apply = (p) => {
@@ -290,6 +291,7 @@ function desktopSetup() {
     $("opt-overlay").checked = !!p.overlay;
     $("opt-startup").checked = !!p.startWithWindows;
     $("app-version").textContent = p.version ? `v${p.version}` : "";
+    $("kit-ver").textContent = p.version ? `· v${p.version}` : "";
     $("update").hidden = !p.update;
     if (DESK.checkUpdates && p.canCheck !== undefined) {
       $("upd-line").hidden = !!p.update;
@@ -318,6 +320,7 @@ function desktopSetup() {
     $("pda-key").onclick = () => DESK.setPdaKey();
   }
   $("desk").hidden = false;
+  $("desk").open = !DESK.kit;
 }
 function pushOverlay() {
   if (!DESK || !R.me) return;
@@ -366,7 +369,11 @@ function meter(stream) {
 }
 
 // ---------- screen ----------
-function setStatus(text, cls) { $("status-text").textContent = text; $("status").className = "pill " + (cls || ""); pushOverlay(); }
+function setStatus(text, cls) {
+  $("status-text").textContent = text; $("status").className = "pill " + (cls || "");
+  $("kit-status").textContent = text.toUpperCase(); $("kit-status").className = cls || "";
+  pushOverlay();
+}
 
 function buildNets() {
   const box = $("nets");
@@ -383,6 +390,7 @@ function buildNets() {
         <span class="count" data-r="count"></span>
         <span class="grow"></span>
         <span data-r="keybox"></span>
+        <button class="more" data-r="more" aria-expanded="false" aria-label="${esc(net.name)}: show who's on and the ear/volume controls">▾</button>
       </div>
       <p class="desc" data-r="desc"></p>
       <div class="speaking" data-r="speaking" hidden></div>
@@ -413,6 +421,7 @@ function buildNets() {
     q("join").onclick = () => joinAs("talk");
     q("monitor").onclick = () => joinAs("monitor");
     el.querySelectorAll("[data-mode]").forEach((b) => (b.onclick = () => joinAs(b.dataset.mode)));
+    q("more").onclick = () => { const open = !el.classList.contains("open"); el.classList.toggle("open", open); q("more").setAttribute("aria-expanded", String(open)); };
     const ptt = q("ptt");
     ptt.onpointerdown = (e) => { e.preventDefault(); ptt.setPointerCapture(e.pointerId); startTalk(key); };
     ptt.onpointerup = ptt.onpointercancel = () => { if (R.tx === key) stopTalk(); };
@@ -442,6 +451,7 @@ function render() {
     const on = R.roster.filter((p) => p.nets.includes(key));
     const talker = on.find((p) => p.talking === key);
     el.classList.toggle("joined", joined);
+    el.classList.toggle("locked", !canListen);
     el.classList.toggle("live", !!talker && joined);
 
     q("count").textContent = `${on.length} on net`;

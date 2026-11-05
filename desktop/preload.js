@@ -4,6 +4,7 @@
 const { contextBridge, ipcRenderer } = require("electron");
 
 contextBridge.exposeInMainWorld("dadopsDesktop", {
+  kit: true, // v0.4+: the radio sits in the field kit chassis
   onInput: (fn) => ipcRenderer.on("dadops:input", (_e, ev) => fn(ev)),
   overlay: (state) => ipcRenderer.send("dadops:overlay", state),
   getPrefs: () => ipcRenderer.invoke("dadops:prefs:get"),

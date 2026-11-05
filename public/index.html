@@ -46,6 +46,10 @@
 
   <!-- 3. On net -->
   <section id="v-net" class="view" hidden>
+    <div class="kit-head">
+      <div class="kcell kbrand"><span class="ring" aria-hidden="true">DAD</span><span><b>DAD OPS</b><small class="klbl">Radio <span id="kit-ver"></span></small></span></div>
+      <div class="kcell kstat"><span class="klbl">Status</span><b id="kit-status">CONNECTING</b></div>
+    </div>
     <div class="head">
       <div class="grow">
         <div class="label">TONIGHT</div>
@@ -58,10 +62,10 @@
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 8v5M12 16.5v.5"></path></svg>
       <div id="notice-text">This is the <b>browser version</b>. Talk keys only work while this tab is in front. For keys that work in-game, use the desktop app.</div>
     </div>
-    <div class="label pad">YOUR NETS</div>
+    <div class="label pad nets-head"><span>YOUR NETS</span><span class="klbl" id="kit-discord"></span></div>
     <div id="nets" class="nets"></div>
-    <div id="desk" class="box desk" hidden>
-      <div class="label">DESKTOP APP <span class="muted" id="app-version"></span></div>
+    <details id="desk" class="box desk" hidden>
+      <summary class="label">DESKTOP APP <span class="muted" id="app-version"></span></summary>
       <label class="opt"><input type="checkbox" id="opt-overlay"> Show the overlay in-game</label>
       <label class="opt"><input type="checkbox" id="opt-startup"> Start with Windows</label>
       <div class="opt pda-row" id="pda-row" hidden>
@@ -73,7 +77,7 @@
       <div class="update-line" id="upd-line" hidden><span class="muted" id="upd-state"></span><button class="ghost small" id="upd-check">Check for updates</button></div>
       <div id="update" class="update" hidden><span id="update-text"></span><button id="update-now" class="join">Restart now</button></div>
       <p class="muted">Closing this window keeps the radio running in the tray (bottom right, by the clock). Right-click the DAD Ops patch there to quit.</p>
-    </div>
+    </details>
     <div class="grow"></div>
     <footer class="foot">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#AEA06E" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"></rect><path d="M5 11a7 7 0 0 0 14 0M12 18v3"></path></svg>

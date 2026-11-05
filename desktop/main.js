@@ -1,16 +1,22 @@
 // =====================================================================
 //  DAD Ops Radio - desktop app (Windows)
 //
-//  A small window around the radio page (the same one that runs in the
-//  browser), plus the three things a browser can't do:
+//  One "field kit" window built like the Field PDA: a rugged chassis
+//  (shell.html) with two separate pages inside it:
+//    * the radio page (the same one that runs in the browser), always on
+//    * the Field PDA (dadops.gg/pda), folded out to the right on demand
+//  They are separate pages side by side, so nothing the PDA does can drop
+//  you off the radio.
+//
+//  Plus the things a browser can't do:
 //    1. Talk keys that work while the game has focus (keyboard and mouse
-//       buttons, including Mouse 4/5).
+//       buttons, including Mouse 4/5), and the F9 key for the kit.
 //    2. An in-game overlay: a see-through, click-through window on top.
-//    3. Living in the system tray, starting with Windows and updating
-//       itself from GitHub releases.
+//    3. The system tray, starting with Windows, and updating itself from
+//       GitHub releases.
 // =====================================================================
 "use strict";
-const { app, BrowserWindow, Tray, Menu, ipcMain, session, screen, nativeImage, shell } = require("electron");
+const { app, BaseWindow, BrowserWindow, WebContentsView, Tray, Menu, ipcMain, session, screen, nativeImage, shell } = require("electron");
 const path = require("path");
 const fs = require("fs");
 const { keyFromHook, buttonFromHook } = require("./keys");
@@ -18,7 +24,7 @@ const { keyFromHook, buttonFromHook } = require("./keys");
 const CONFIG = JSON.parse(fs.readFileSync(path.join(__dirname, "config.json"), "utf8"));
 const RADIO_URL = (process.env.DADOPS_RADIO_URL || CONFIG.radioUrl).replace(/\/+$/, "");
 const RADIO_ORIGIN = new URL(RADIO_URL).origin;
-const PDA_URL = CONFIG.pdaUrl || "https://dadops.gg/pda";
+const PDA_URL = process.env.DADOPS_PDA_URL || CONFIG.pdaUrl || "https://dadops.gg/pda";
 const PDA_ORIGIN = new URL(PDA_URL).origin;
 const ICON = path.join(__dirname, "build", "icon.png");
 
@@ -28,6 +34,7 @@ const allowed = (url) => {
   try { const u = new URL(url); return ALLOWED.includes(u.origin) || /\.supabase\.co$/.test(u.hostname); } catch { return false; }
 };
 const fromRadio = (e) => { try { return new URL(e.senderFrame.url).origin === RADIO_ORIGIN; } catch { return false; } };
+const fromShell = (e) => { try { return e.sender === (shellView && shellView.webContents); } catch { return false; } };
 
 // Sound must keep playing while the game is in front.
 app.commandLine.appendSwitch("autoplay-policy", "no-user-gesture-required");
@@ -39,32 +46,163 @@ if (!app.requestSingleInstanceLock()) { app.quit(); }
 
 // ---------- saved settings ----------
 const PREFS_FILE = () => path.join(app.getPath("userData"), "prefs.json");
-let prefs = { overlay: true, startWithWindows: false, pdaKey: { code: "F9" }, pdaBounds: null };
+let prefs = { overlay: true, startWithWindows: false, pdaKey: { code: "F9" }, unfolded: false, openWidth: 1560, kitBounds: null };
 function loadPrefs() { try { prefs = { ...prefs, ...JSON.parse(fs.readFileSync(PREFS_FILE(), "utf8")) }; } catch {} }
 function savePrefs() { try { fs.writeFileSync(PREFS_FILE(), JSON.stringify(prefs, null, 2)); } catch {} }
 
 let updState = "", checkNow = null;
-let win = null, overlay = null, pda = null, tray = null, quitting = false, lastOverlay = null, update = null, capturingPda = false;
+let kit = null, shellView = null, radioView = null, pdaView = null, overlay = null, tray = null;
+let quitting = false, lastOverlay = null, update = null, capturingPda = false, unfolded = false, overGame = false;
 
-function createWindow(startHidden) {
-  win = new BrowserWindow({
-    width: 500, height: 900, minWidth: 380, minHeight: 520,
-    title: "DAD Ops Radio", icon: ICON, backgroundColor: "#0E0E0B", autoHideMenuBar: true, show: !startHidden,
-    webPreferences: { preload: path.join(__dirname, "preload.js"), contextIsolation: true, sandbox: true, backgroundThrottling: false },
-  });
-  win.setMenuBarVisibility(false);
-  win.loadURL(RADIO_URL + "/");
+// ---------- the field kit window ----------
+// Chassis sizes (match shell.html): outer margin, rim, screen padding, status strip.
+const G = { out: 8, rim: 36, pad: 10, status: 26, gap: 10, tab: 30, radioW: 384, hinge: 26 };
+const FOLDED_W = 480, OPEN_MIN_W = 1440, MIN_H = 620;
 
-  win.webContents.setWindowOpenHandler(({ url }) => { if (/^https?:/.test(url)) shell.openExternal(url); return { action: "deny" }; });
-  win.webContents.on("will-navigate", (e, url) => { if (!allowed(url)) { e.preventDefault(); if (/^https?:/.test(url)) shell.openExternal(url); } });
-  win.webContents.on("did-fail-load", (_e, code, desc, url, isMain) => {
-    if (isMain && code !== -3) setTimeout(() => win && !win.isDestroyed() && win.loadURL(RADIO_URL + "/"), 5000);
+const radioPrefs = () => ({ contextIsolation: true, sandbox: true, backgroundThrottling: false, preload: path.join(__dirname, "preload.js") });
+
+function guard(wc, origin) {
+  wc.setWindowOpenHandler(({ url }) => {
+    try { if (origin && new URL(url).origin === origin) { wc.loadURL(url); return { action: "deny" }; } } catch {}
+    if (/^https?:/.test(url)) shell.openExternal(url);
+    return { action: "deny" };
   });
-  win.on("close", (e) => { if (!quitting) { e.preventDefault(); win.hide(); } });
-  // Mouse 4/5 inside the window must not act as Back/Forward.
-  win.on("app-command", (e) => e.preventDefault());
+  wc.on("will-navigate", (e, url) => { if (!allowed(url)) { e.preventDefault(); if (/^https?:/.test(url)) shell.openExternal(url); } });
 }
 
+function createKit(startHidden) {
+  const wa = screen.getPrimaryDisplay().workArea;
+  const b = prefs.kitBounds || {};
+  kit = new BaseWindow({
+    width: FOLDED_W, height: Math.min(b.height || 880, wa.height), x: b.x, y: b.y,
+    minWidth: 420, minHeight: MIN_H, frame: false, title: "DAD Ops Radio", icon: ICON,
+    backgroundColor: "#1a1914", show: false,
+  });
+
+  shellView = new WebContentsView({ webPreferences: { contextIsolation: true, sandbox: true, preload: path.join(__dirname, "shell-preload.js") } });
+  kit.contentView.addChildView(shellView);
+  shellView.webContents.loadFile(path.join(__dirname, "shell.html"));
+  shellView.webContents.on("will-navigate", (e) => e.preventDefault());
+  shellView.webContents.on("did-finish-load", () => { layout(); sendStatus(); });
+
+  radioView = new WebContentsView({ webPreferences: radioPrefs() });
+  kit.contentView.addChildView(radioView);
+  radioView.webContents.loadURL(RADIO_URL + "/");
+  guard(radioView.webContents, null);
+  radioView.webContents.on("did-fail-load", (_e, code, _d, _u, isMain) => {
+    if (isMain && code !== -3) setTimeout(() => radioView && radioView.webContents.loadURL(RADIO_URL + "/"), 5000);
+  });
+
+  kit.on("resize", () => { layout(); });
+  const keep = () => {
+    if (!kit || kit.isMinimized() || kit.isMaximized()) return;
+    const r = kit.getBounds();
+    prefs.kitBounds = { x: r.x, y: r.y, height: r.height };
+    if (unfolded) prefs.openWidth = r.width;
+    savePrefs();
+  };
+  kit.on("moved", keep); kit.on("resized", keep);
+  kit.on("close", (e) => { if (!quitting) { e.preventDefault(); hideKit(); } });
+  // Mouse 4/5 inside the window must not act as Back/Forward.
+  kit.on("app-command", (e) => e.preventDefault());
+
+  if (prefs.unfolded) setUnfolded(true); else layout();
+  if (!startHidden) kit.show();
+}
+
+function layout() {
+  if (!kit) return;
+  const [W, H] = kit.getContentSize();
+  const chassis = { x: G.out, y: G.out, w: W - G.out * 2 - (unfolded ? 0 : G.tab), h: H - G.out * 2 };
+  const scr = { x: chassis.x + G.rim, y: chassis.y + G.rim, w: chassis.w - G.rim * 2, h: chassis.h - G.rim * 2 };
+  const area = { x: scr.x + G.pad, y: scr.y + G.pad, w: scr.w - G.pad * 2, h: scr.h - G.pad * 2 - G.status - G.gap };
+  const status = { x: area.x, y: area.y + area.h + G.gap, w: area.w, h: G.status };
+  let radio, pda = null, hinge = null, tab = null;
+  if (unfolded) {
+    radio = { x: area.x, y: area.y, w: G.radioW, h: area.h };
+    hinge = { x: area.x + G.radioW, y: area.y, w: G.hinge, h: area.h };
+    pda = { x: hinge.x + G.hinge, y: area.y, w: area.w - G.radioW - G.hinge, h: area.h };
+  } else {
+    radio = { x: area.x, y: area.y, w: area.w, h: area.h };
+    tab = { x: chassis.x + chassis.w - 2, y: chassis.y + Math.round(chassis.h / 2) - 95, w: G.tab, h: 190 };
+  }
+  const r = (o) => ({ x: Math.round(o.x), y: Math.round(o.y), width: Math.max(1, Math.round(o.w)), height: Math.max(1, Math.round(o.h)) });
+  shellView.setBounds({ x: 0, y: 0, width: W, height: H });
+  radioView.setBounds(r(radio));
+  if (pdaView) { pdaView.setVisible(!!pda); if (pda) pdaView.setBounds(r(pda)); }
+  shellView.webContents.send("kit:layout", { W, H, unfolded, chassis, screen: scr, status, hinge, tab, pdaKey: keyName(prefs.pdaKey) });
+}
+
+// The PDA's own chassis and the cells the radio already shows are hidden inside the kit.
+const PDA_KIT_CSS = `
+  body.pda-page{background:#0f0f0b!important}
+  .pda-desk{padding:0!important;background:#0f0f0b!important;min-height:100vh!important}
+  .pda{height:100vh!important;max-width:none!important;min-height:0!important;border-radius:0!important;padding:0!important;background:transparent!important;box-shadow:none!important}
+  .pda::before,.pda-screw,.pda-brand,.pda-who,.pda-win,.pda-status{display:none!important}
+  .pda-screen{border:0!important;border-radius:0!important;padding:0!important;background:transparent!important}
+`;
+function ensurePda() {
+  if (pdaView) return;
+  pdaView = new WebContentsView({ webPreferences: { contextIsolation: true, sandbox: true } });
+  pdaView.setBackgroundColor("#0f0f0b");
+  kit.contentView.addChildView(pdaView);
+  pdaView.webContents.on("dom-ready", () => { if (pdaView.webContents.getURL().startsWith(PDA_ORIGIN)) pdaView.webContents.insertCSS(PDA_KIT_CSS); });
+  guard(pdaView.webContents, PDA_ORIGIN);
+  pdaView.webContents.loadURL(PDA_URL);
+}
+
+function setUnfolded(open) {
+  open = !!open;
+  if (open === unfolded) { layout(); return; }
+  unfolded = open;
+  prefs.unfolded = open; savePrefs();
+  const b = kit.getBounds();
+  const wa = screen.getDisplayMatching(b).workArea;
+  if (open) {
+    ensurePda();
+    const w = Math.min(Math.max(prefs.openWidth || 1560, OPEN_MIN_W), wa.width);
+    let x = b.x; if (x + w > wa.x + wa.width) x = Math.max(wa.x, wa.x + wa.width - w);
+    kit.setBounds({ x, y: b.y, width: w, height: b.height });
+    kit.setMinimumSize(Math.min(OPEN_MIN_W, wa.width), MIN_H);
+  } else {
+    kit.setMinimumSize(420, MIN_H);
+    kit.setBounds({ x: b.x, y: b.y, width: FOLDED_W, height: b.height });
+  }
+  layout();
+  sendStatus();
+}
+
+function showKit({ unfold, onTop } = {}) {
+  if (unfold !== undefined) setUnfolded(unfold);
+  overGame = !!onTop;
+  kit.setAlwaysOnTop(overGame, "screen-saver");
+  if (kit.isMinimized()) kit.restore();
+  kit.show();
+  kit.focus();
+}
+function hideKit() {
+  kit.hide();
+  if (overGame) { kit.setAlwaysOnTop(false); overGame = false; }
+}
+// F9: pop the whole kit up over the game, unfolded. Again: tuck it away (the radio stays on net).
+function kitKey() {
+  if (!kit.isVisible() || kit.isMinimized() || !unfolded) showKit({ unfold: true, onTop: true });
+  else hideKit();
+}
+
+function sendStatus() {
+  if (!shellView) return;
+  const o = lastOverlay || {};
+  const nets = o.nets || [];
+  const tx = nets.find((n) => n.you), live = nets.find((n) => n.talker);
+  shellView.webContents.send("kit:status", {
+    status: o.status || "Connecting",
+    line: tx ? `TX · ${tx.name.toUpperCase()}` : live ? `${live.short} · ${String(live.talker).toUpperCase()}` : `${nets.length} NET${nets.length === 1 ? "" : "S"}`,
+    pdaKey: keyName(prefs.pdaKey), unfolded, overlay: prefs.overlay,
+  });
+}
+
+// ---------- the in-game overlay ----------
 function createOverlay() {
   const d = screen.getPrimaryDisplay().workArea;
   overlay = new BrowserWindow({
@@ -79,7 +217,6 @@ function createOverlay() {
   overlay.loadFile(path.join(__dirname, "overlay.html"));
   overlay.webContents.on("will-navigate", (e) => e.preventDefault());
 }
-
 function showOverlay() {
   if (!overlay || overlay.isDestroyed()) return;
   const want = prefs.overlay && lastOverlay && lastOverlay.on;
@@ -88,33 +225,6 @@ function showOverlay() {
   if (lastOverlay) overlay.webContents.send("dadops:overlay-state", lastOverlay);
 }
 
-// ---------- the Field PDA (dadops.gg/pda) in its own window ----------
-function createPda() {
-  const b = prefs.pdaBounds || {};
-  pda = new BrowserWindow({
-    width: b.width || 1180, height: b.height || 760, x: b.x, y: b.y, minWidth: 380, minHeight: 480,
-    title: "DAD Ops Field PDA", icon: ICON, backgroundColor: "#0E0E0B", autoHideMenuBar: true, show: false,
-    webPreferences: { contextIsolation: true, sandbox: true },
-  });
-  pda.setMenuBarVisibility(false);
-  pda.setAlwaysOnTop(true, "screen-saver");
-  pda.loadURL(PDA_URL);
-  pda.webContents.setWindowOpenHandler(({ url }) => {
-    if (allowed(url) && new URL(url).origin === PDA_ORIGIN) { pda.loadURL(url); return { action: "deny" }; }
-    if (/^https?:/.test(url)) shell.openExternal(url);
-    return { action: "deny" };
-  });
-  pda.webContents.on("will-navigate", (e, url) => { if (!allowed(url)) { e.preventDefault(); if (/^https?:/.test(url)) shell.openExternal(url); } });
-  const keep = () => { if (!pda.isMinimized() && !pda.isMaximized()) { prefs.pdaBounds = pda.getBounds(); savePrefs(); } };
-  pda.on("moved", keep); pda.on("resized", keep);
-  pda.on("close", (e) => { if (!quitting) { e.preventDefault(); pda.hide(); } });
-  pda.on("app-command", (e) => e.preventDefault());
-}
-function togglePda(force) {
-  if (!pda || pda.isDestroyed()) createPda();
-  const show = force === undefined ? !pda.isVisible() : force;
-  if (show) { pda.show(); pda.focus(); } else pda.hide();
-}
 const pdaKeyMatches = (ev) => { const k = prefs.pdaKey; return !!k && ((k.code && ev.code === k.code) || (k.button != null && ev.button === k.button)); };
 
 function applyStartWithWindows() {
@@ -125,8 +235,8 @@ function buildTray() {
   tray = new Tray(nativeImage.createFromPath(ICON).resize({ width: 16, height: 16 }));
   tray.setToolTip("DAD Ops Radio");
   const menu = () => Menu.buildFromTemplate([
-    { label: "Open DAD Ops Radio", click: () => { win.show(); win.focus(); } },
-    { label: `Field PDA (${keyName(prefs.pdaKey)})`, click: () => togglePda(true) },
+    { label: "Open DAD Ops Radio", click: () => showKit({}) },
+    { label: `Field PDA (${keyName(prefs.pdaKey)})`, click: () => showKit({ unfold: true }) },
     { type: "separator" },
     { label: "Show overlay in-game", type: "checkbox", checked: prefs.overlay, click: (m) => { prefs.overlay = m.checked; savePrefs(); showOverlay(); sendPrefs(); } },
     { label: "Start with Windows", type: "checkbox", checked: prefs.startWithWindows, click: (m) => { prefs.startWithWindows = m.checked; savePrefs(); applyStartWithWindows(); sendPrefs(); } },
@@ -136,47 +246,52 @@ function buildTray() {
     { label: "Quit", click: () => { quitting = true; app.quit(); } },
   ]);
   tray.setContextMenu(menu());
-  tray.on("click", () => { win.isVisible() ? win.focus() : win.show(); });
+  tray.on("click", () => showKit({}));
   tray.refresh = () => tray.setContextMenu(menu());
 }
 
 function publicPrefs() {
-  return { overlay: prefs.overlay, startWithWindows: prefs.startWithWindows, pdaKey: prefs.pdaKey, capturingPda, version: app.getVersion(), update, updState, canCheck: !!checkNow };
+  return { overlay: prefs.overlay, startWithWindows: prefs.startWithWindows, pdaKey: prefs.pdaKey, capturingPda, unfolded,
+    version: app.getVersion(), update, updState, canCheck: !!checkNow };
 }
 function keyName(k) {
   if (!k) return "no key";
   if (k.button != null) return `Mouse ${k.button + 1}`;
   return String(k.code || "").replace(/^Key/, "").replace(/^Digit/, "");
 }
-
 function sendPrefs() {
-  if (win && !win.isDestroyed()) win.webContents.send("dadops:prefs", publicPrefs());
+  if (radioView) radioView.webContents.send("dadops:prefs", publicPrefs());
   if (tray && tray.refresh) tray.refresh();
+  sendStatus();
 }
 
-// ---------- talk keys that work in-game ----------
+// ---------- talk keys (and the kit key) that work in-game ----------
 function startHook() {
   let hook;
   try { hook = require("uiohook-napi").uIOhook; } catch (e) { console.error("Global keys unavailable:", e.message); return; }
   const down = new Set();
-  const deliver = (ev) => { if (win && !win.isDestroyed()) win.webContents.send("dadops:input", ev); };
-  // The Field PDA key opens/closes the PDA and is kept away from the radio's talk keys.
+  const deliver = (ev) => { if (radioView) radioView.webContents.send("dadops:input", ev); };
+  // The kit key (F9) opens/closes the kit and is kept away from the radio's talk keys.
   const send = (ev) => {
     if (capturingPda) {
       if (ev.type !== "down") return;
       capturingPda = false;
-      if (ev.code !== "Escape") { prefs.pdaKey = ev.code ? { code: ev.code } : { button: ev.button }; savePrefs(); }
+      if (ev.code !== "Escape") { prefs.pdaKey = ev.code ? { code: ev.code } : { button: ev.button }; savePrefs(); layout(); }
       sendPrefs();
       return;
     }
-    if (pdaKeyMatches(ev)) { if (ev.type === "down") togglePda(); return; }
+    if (pdaKeyMatches(ev)) { if (ev.type === "down") kitKey(); return; }
     deliver(ev);
   };
   hook.on("keydown", (e) => { const k = keyFromHook(e.keycode); if (down.has(k)) return; down.add(k); send({ type: "down", code: k }); });
   hook.on("keyup", (e) => { const k = keyFromHook(e.keycode); down.delete(k); send({ type: "up", code: k }); });
   hook.on("mousedown", (e) => { const b = buttonFromHook(e.button); if (b == null || b === 0 || b === 2) return; send({ type: "down", button: b }); });
   hook.on("mouseup", (e) => { const b = buttonFromHook(e.button); if (b == null || b === 0 || b === 2) return; send({ type: "up", button: b }); });
-  if (process.env.DADOPS_TEST === "1") global.__dadopsHook = hook; // lets the automated tests press keys
+  if (process.env.DADOPS_TEST === "1") { // lets the automated tests press keys and look at the kit
+    global.__dadopsHook = hook;
+    global.__kitState = () => ({ visible: kit.isVisible(), unfolded, onTop: kit.isAlwaysOnTop(), width: kit.getBounds().width, pda: !!pdaView });
+    global.__kitShow = () => showKit({});
+  }
   try { hook.start(); } catch (e) { console.error("Global keys failed to start:", e.message); }
   app.on("will-quit", () => { try { hook.stop(); } catch {} });
 }
@@ -209,6 +324,7 @@ ipcMain.on("dadops:overlay", (e, state) => {
   if (!fromRadio(e) || !state || typeof state !== "object") return;
   lastOverlay = state;
   showOverlay();
+  sendStatus();
 });
 ipcMain.handle("dadops:prefs:get", (e) => (fromRadio(e) ? publicPrefs() : null));
 ipcMain.handle("dadops:prefs:set", (e, p) => {
@@ -220,10 +336,19 @@ ipcMain.handle("dadops:prefs:set", (e, p) => {
 });
 ipcMain.on("dadops:install-update", (e) => { if (fromRadio(e) && update) installUpdate(); });
 ipcMain.on("dadops:check-updates", (e) => { if (fromRadio(e) && checkNow) checkNow(); });
-ipcMain.on("dadops:pda", (e, show) => { if (fromRadio(e)) togglePda(show === undefined ? undefined : !!show); });
+ipcMain.on("dadops:pda", (e, show) => { if (fromRadio(e)) setUnfolded(show === undefined ? !unfolded : !!show); });
 ipcMain.on("dadops:pda-key", (e) => { if (fromRadio(e)) { capturingPda = true; sendPrefs(); } });
 
-app.on("second-instance", () => { if (win) { win.show(); win.focus(); } });
+// ---------- messages from the chassis ----------
+ipcMain.on("kit:cmd", (e, cmd) => {
+  if (!fromShell(e)) return;
+  if (cmd === "min") kit.minimize();
+  else if (cmd === "hide") hideKit();
+  else if (cmd === "fold") setUnfolded(false);
+  else if (cmd === "unfold") setUnfolded(true);
+});
+
+app.on("second-instance", () => { if (kit) showKit({}); });
 app.on("before-quit", () => { quitting = true; });
 app.on("window-all-closed", (e) => e.preventDefault());
 
@@ -235,7 +360,7 @@ app.whenReady().then(() => {
     cb(origin === RADIO_ORIGIN && (perm === "media" || perm === "audioCapture"));
   });
   session.defaultSession.setPermissionCheckHandler((_wc, perm, origin) => origin === RADIO_ORIGIN && (perm === "media" || perm === "audioCapture"));
-  createWindow(process.argv.includes("--hidden"));
+  createKit(process.argv.includes("--hidden"));
   createOverlay();
   buildTray();
   applyStartWithWindows();

@@ -89,3 +89,71 @@ body.desktop .test-tag{display:none}
 .joinrow{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
 .chip.mon{background:transparent;border:1px dashed var(--line2);color:var(--muted)}
 .update-line{display:flex;align-items:center;gap:10px;justify-content:space-between;flex-wrap:wrap}
+
+/* ---------- the field kit look (desktop app v0.4+) ---------- */
+.kit-head,.more,.nets-head .klbl{display:none}
+.nets-head{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
+body.kit{background:#0f0f0b}
+body.kit .app{max-width:none;border:0;min-height:100vh}
+body.kit .bar,body.kit .notice,body.kit .pill{display:none}
+body.kit .view{padding:0}
+body.kit .kit-head{display:flex;gap:8px;padding:0 0 8px}
+.kcell{background:#15150f;border:1px solid #3a3528;border-radius:8px;padding:8px 12px;display:flex;flex-direction:column;justify-content:center;gap:4px;box-sizing:border-box}
+.kbrand{flex:1;flex-direction:row;align-items:center;justify-content:flex-start;gap:10px}
+.kbrand b{display:block;font:18px "Black Ops One",sans-serif;color:var(--cream)}
+.ring{width:38px;height:38px;flex:none;border-radius:50%;border:4px solid var(--olive);box-sizing:border-box;display:flex;align-items:center;justify-content:center;font:11px "Black Ops One",sans-serif;color:var(--tan)}
+.klbl{display:block;font:600 10px/1.2 "IBM Plex Mono",monospace;letter-spacing:.12em;text-transform:uppercase;color:var(--olive-light)}
+.kstat b{font:600 13px "IBM Plex Mono",monospace;color:var(--olive-light);white-space:nowrap}
+.kstat b.on{color:var(--tan)} .kstat b.bad{color:var(--red)}
+body.kit .head{background:#15150f;border:1px solid #3a3528;border-radius:8px;padding:10px 12px;margin:0}
+body.kit .head .label{font:600 10px/1.2 "IBM Plex Mono",monospace;letter-spacing:.12em;color:var(--olive-light)}
+body.kit .tonight{font-size:20px;letter-spacing:.04em;text-transform:uppercase}
+body.kit #whoami{font:500 11px "IBM Plex Mono",monospace;letter-spacing:.06em;text-transform:uppercase;color:#b8ae97;margin-top:2px}
+body.kit .nets-head{font:18px "Black Ops One",sans-serif;letter-spacing:0;color:var(--tan);border-bottom:1px solid var(--tan-dark);padding:10px 2px 6px;margin:4px 0 8px}
+body.kit .nets-head .klbl{display:block}
+body.kit .nets{padding:0;gap:8px}
+body.kit .net{position:relative;background:#191912;border:1px solid #3a3528;border-radius:8px;padding:9px 12px 9px 20px;gap:8px}
+body.kit .net::before{content:"";position:absolute;left:8px;top:11px;bottom:11px;width:4px;border-radius:2px;background:var(--olive)}
+body.kit .net.joined{background:#191912;border-color:#3a3528}
+body.kit .net.live{background:#262115;border-color:var(--tan-dark)}
+body.kit .net.live::before{background:var(--tan)}
+body.kit .net.allcall::before{background:var(--red)}
+body.kit .net.allcall.live{border-color:var(--red)}
+body.kit .net-name{font:800 15px "Big Shoulders Display",sans-serif;letter-spacing:.14em;color:#d9cfb6}
+body.kit .net.live .net-name{color:var(--tan)}
+body.kit .net:not(.joined) .net-name{color:#8f8770}
+body.kit .count{font:600 10px "IBM Plex Mono",monospace;letter-spacing:.12em;text-transform:uppercase;color:#b8ae97}
+body.kit .tag{font:600 10px "IBM Plex Mono",monospace;letter-spacing:.12em;background:transparent;border:1px solid #4a4434;color:var(--olive-light);padding:3px 7px}
+body.kit .key{font-size:11px;border-color:#4a4434;background:#0f0f0b}
+body.kit .desc{font-size:12px}
+body.kit .chip{background:transparent;border:1px solid #3a3528}
+body.kit .chip.on{border-color:var(--tan-dark);background:transparent}
+body.kit .seg button{font:600 11px "Big Shoulders Display",sans-serif;letter-spacing:.12em;text-transform:uppercase;padding:5px 9px}
+body.kit .join{font:600 11px "IBM Plex Mono",monospace;letter-spacing:.08em;text-transform:uppercase;min-height:30px;padding:0 10px;border-color:var(--tan-dark);background:#1f1d15}
+body.kit .ghost.small{font:600 11px "IBM Plex Mono",monospace;letter-spacing:.08em;text-transform:uppercase;min-height:30px}
+body.kit .speaking{background:transparent;padding:0}
+body.kit .ptt{display:none}
+body.kit .more{display:inline-flex;align-items:center;justify-content:center;width:28px;height:26px;border:1px solid #4a4434;border-radius:5px;background:#0f0f0b;color:#d9cfb6;font-size:12px;padding:0}
+body.kit .net.open .more{transform:rotate(180deg)}
+body.kit .net:not(.joined) .more{display:none}
+/* compact: who's on and the controls only on a net that's talking, or one you opened */
+body.kit .net:not(.open):not(.live) [data-r="people"],
+body.kit .net:not(.open) [data-r="controls"]{display:none!important}
+body.kit .desk{margin:10px 0 0;background:#15150f;border:1px solid #3a3528;border-radius:8px}
+body.kit .desk summary{cursor:pointer;font:600 10px/1.2 "IBM Plex Mono",monospace;letter-spacing:.12em;color:var(--olive-light)}
+body.kit .foot{position:static;margin-top:10px;background:#15150f;border:1px solid #3a3528;border-radius:8px;font:500 12px "IBM Plex Mono",monospace;letter-spacing:.04em;text-transform:uppercase}
+body.kit .foot.tx{background:var(--tan);color:var(--black)}
+details.desk summary{list-style:none}
+details.desk summary::-webkit-details-marker{display:none}
+details.desk summary::after{content:" ▾";color:var(--muted)}
+details.desk[open] summary::after{content:" ▴"}
+body.kit .net.locked .desc{display:block}
+body.kit .net:not(.joined) .desc{display:none}
+body.kit .net.locked .desc{display:block}
+body.kit .net:not(.joined){padding-top:8px;padding-bottom:8px}
+body.kit ::-webkit-scrollbar{width:6px}
+body.kit ::-webkit-scrollbar-track{background:transparent}
+body.kit ::-webkit-scrollbar-thumb{background:#3a3528;border-radius:3px}
+html.kit::-webkit-scrollbar{width:6px}
+html.kit::-webkit-scrollbar-track{background:#0f0f0b}
+html.kit::-webkit-scrollbar-thumb{background:#3a3528;border-radius:3px}

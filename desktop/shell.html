@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; script-src 'self'">
+<title>DAD Ops Radio</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;800&family=IBM+Plex+Mono:wght@500;600&display=swap">
+<style>
+  html,body{margin:0;height:100%;background:#1a1914;overflow:hidden;user-select:none;font-family:"IBM Plex Mono",monospace}
+  body{-webkit-app-region:drag}
+  button{-webkit-app-region:no-drag;cursor:pointer}
+  .abs{position:absolute;box-sizing:border-box}
+  #chassis{border-radius:30px;background:#0b0b09;box-shadow:0 18px 40px rgba(0,0,0,.55),inset 0 0 0 1px #2a271d}
+  #rim{border-radius:22px;background:#24221a;border:1px solid #3d3929}
+  .screw{position:absolute;width:14px;height:14px;border-radius:50%;background:#2b2920;border:2px solid #0b0b09;box-shadow:inset 0 0 0 3px #2b2920,inset 0 0 0 4px #4a4434}
+  #screen{background:#0f0f0b;border:1px solid #2f2c22;border-radius:12px}
+  #engrave{font:600 10px "IBM Plex Mono",monospace;letter-spacing:.3em;color:#6f6750;white-space:nowrap}
+  #winbtns{display:flex;gap:6px}
+  #winbtns button{width:30px;height:22px;border-radius:5px;background:#1a1812;border:1px solid #4a4434;color:#d9cfb6;font:600 13px/1 "IBM Plex Mono",monospace;padding:0}
+  #winbtns button:hover{border-color:#F3B77A;color:#F3B77A}
+  #status{border:1px solid #2f2c22;border-radius:6px;display:flex;align-items:center;justify-content:center;gap:14px;font:600 10px "IBM Plex Mono",monospace;letter-spacing:.14em;color:#AEA06E;white-space:nowrap;overflow:hidden}
+  #status .on{color:#F3B77A}
+  #status .bad{color:#FF5B4F}
+  #hinge{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px}
+  #hinge i{flex:1;width:2px;background:#2f2c22}
+  .vbtn{writing-mode:vertical-rl;font:600 12px "Big Shoulders Display",sans-serif;letter-spacing:.2em;color:#F3B77A;background:#191912;border:1px solid #C98B4E;padding:0}
+  #fold{width:24px;height:96px;border-radius:6px}
+  #unfold{border-radius:0 10px 10px 0;border-left:0;background:#24221a}
+  .vbtn:hover{background:#262115}
+  [hidden]{display:none!important}
+</style>
+</head>
+<body>
+<div id="chassis" class="abs"></div>
+<div id="rim" class="abs"></div>
+<span class="screw" id="s1"></span><span class="screw" id="s2"></span><span class="screw" id="s3"></span><span class="screw" id="s4"></span>
+<div id="engrave" class="abs">DAD OPS · FIELD KIT</div>
+<div id="winbtns" class="abs"><button id="min" aria-label="Minimize" title="Minimize">–</button><button id="hide" aria-label="Hide to the tray (stays on net)" title="Hide to the tray (stays on net)">×</button></div>
+<div id="screen" class="abs"></div>
+<div id="hinge" class="abs" hidden><i></i><button id="fold" class="vbtn" aria-label="Fold the Field PDA away" title="Fold the Field PDA away">◂ FOLD</button><i></i></div>
+<button id="unfold" class="abs vbtn" aria-label="Unfold the Field PDA" title="Unfold the Field PDA" hidden>FIELD PDA ▸</button>
+<div id="status" class="abs" role="status"></div>
+<script src="shell.js"></script>
+</body>
+</html>
