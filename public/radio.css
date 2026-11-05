@@ -160,3 +160,9 @@ html.kit::-webkit-scrollbar-thumb{background:#3a3528;border-radius:3px}
 #hook-state.good{color:var(--olive-light)} #hook-state.bad{color:var(--red)}
 #flash{margin:0 20px 8px;padding:8px 12px;border:1px solid var(--red);border-radius:8px;color:#ffb3ad;font-size:13px}
 body.kit #flash{margin:0 0 8px}
+.mic select{width:100%;min-height:36px;background:#15140F;color:var(--cream);border:1px solid var(--line2);border-radius:6px;padding:0 8px;font:inherit;font-size:14px}
+.miclbl{font-size:13px;color:var(--muted)}
+.mic-meter{margin:4px 0 2px} .mic-meter span{width:12px;height:8px}
+.mic-meter span.hot{background:var(--red)!important}
+#mic-check:disabled{opacity:.6;cursor:default}
+body.kit .mic{margin-top:10px}

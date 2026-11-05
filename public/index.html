@@ -64,6 +64,14 @@
     </div>
     <div class="label pad nets-head"><span>YOUR NETS</span><span class="klbl" id="kit-discord"></span></div>
     <div id="nets" class="nets"></div>
+    <details id="micbox" class="box desk mic" hidden>
+      <summary class="label">MIC CHECK</summary>
+      <label class="miclbl" for="mic-pick">Microphone</label>
+      <select id="mic-pick"></select>
+      <label class="vol">Boost <input type="range" id="mic-boost" min="50" max="300" step="10" aria-label="Mic boost"> <span id="mic-boost-val">100%</span></label>
+      <div class="meter mic-meter" id="mic-meter" aria-hidden="true"></div>
+      <div class="update-line"><span class="muted" id="mic-state">Click Radio check and say "radio check, one two". You'll hear it played back.</span><button class="join" id="mic-check">Radio check</button></div>
+    </details>
     <details id="desk" class="box desk" hidden>
       <summary class="label">DESKTOP APP <span class="muted" id="app-version"></span></summary>
       <p class="muted" id="hook-state" hidden></p>

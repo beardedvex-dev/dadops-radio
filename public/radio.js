@@ -140,8 +140,91 @@ function teardown() {
   R.pc = null;
   for (const p of R.pipes.values()) { try { p.el.srcObject = null; p.src.disconnect(); } catch {} }
   R.pipes.clear(); R.midToConn.clear(); R.pulled.clear();
-  if (R.mic) R.mic.getTracks().forEach((t) => t.stop());
-  R.mic = null; R.micTrack = null;
+  if (R.rawMic) R.rawMic.getTracks().forEach((t) => t.stop());
+  try { R.micSrc && R.micSrc.disconnect(); R.micGain && R.micGain.disconnect(); } catch {}
+  R.mic = null; R.micTrack = null; R.rawMic = null; R.micSrc = null; R.micGain = null; R.checkDest = null;
+}
+
+// ---------- the microphone: picker, boost and radio check ----------
+// Mic -> boost -> what goes out on the radio (switched off except while you talk)
+//              -> a private copy, only for the radio check recording
+let micPrefs = { deviceId: "", boost: 100 };
+try { micPrefs = { ...micPrefs, ...JSON.parse(localStorage.getItem("dadops-radio-mic") || "{}") }; } catch {}
+const saveMic = () => { try { localStorage.setItem("dadops-radio-mic", JSON.stringify(micPrefs)); } catch {} };
+const MIC_OPTS = { echoCancellation: true, noiseSuppression: true, autoGainControl: true };
+
+async function getRawMic(deviceId) {
+  try {
+    return await navigator.mediaDevices.getUserMedia({ audio: deviceId ? { ...MIC_OPTS, deviceId: { exact: deviceId } } : MIC_OPTS });
+  } catch (e) {
+    if (!deviceId) throw e;
+    micPrefs.deviceId = ""; saveMic(); // that mic is gone: fall back to the default one
+    return navigator.mediaDevices.getUserMedia({ audio: MIC_OPTS });
+  }
+}
+async function openMic() {
+  R.rawMic = await getRawMic(micPrefs.deviceId);
+  R.micSrc = R.ctx.createMediaStreamSource(R.rawMic);
+  R.micGain = R.ctx.createGain(); R.micGain.gain.value = micPrefs.boost / 100;
+  const out = R.ctx.createMediaStreamDestination();
+  R.checkDest = R.ctx.createMediaStreamDestination();
+  R.micSrc.connect(R.micGain); R.micGain.connect(out); R.micGain.connect(R.checkDest);
+  R.mic = out.stream; R.micTrack = out.stream.getAudioTracks()[0]; R.micTrack.enabled = false;
+}
+async function switchMic(deviceId) {
+  const raw = await getRawMic(deviceId);
+  try { R.micSrc.disconnect(); } catch {}
+  if (R.rawMic) R.rawMic.getTracks().forEach((t) => t.stop());
+  R.rawMic = raw;
+  R.micSrc = R.ctx.createMediaStreamSource(raw); R.micSrc.connect(R.micGain);
+  micPrefs.deviceId = deviceId; saveMic();
+  micList();
+}
+async function micList() {
+  const pick = $("mic-pick"); if (!pick) return;
+  let devs = [];
+  try { devs = (await navigator.mediaDevices.enumerateDevices()).filter((d) => d.kind === "audioinput" && d.deviceId !== "default" && d.deviceId !== "communications"); } catch {}
+  const current = (R.rawMic && R.rawMic.getAudioTracks()[0] && R.rawMic.getAudioTracks()[0].getSettings().deviceId) || micPrefs.deviceId;
+  pick.innerHTML = `<option value="">Windows default (usually the same as Discord)</option>` +
+    devs.map((d, i) => `<option value="${esc(d.deviceId)}">${esc(d.label || "Microphone " + (i + 1))}</option>`).join("");
+  pick.value = micPrefs.deviceId && devs.some((d) => d.deviceId === micPrefs.deviceId) ? micPrefs.deviceId : "";
+  pick.dataset.current = current || "";
+}
+function micSetup() {
+  if (!R.micTrack) { $("micbox").hidden = true; return; }
+  $("micbox").hidden = false;
+  micList();
+  const b = $("mic-boost");
+  b.value = micPrefs.boost; $("mic-boost-val").textContent = `${micPrefs.boost}%`;
+  b.oninput = () => { micPrefs.boost = +b.value; $("mic-boost-val").textContent = `${b.value}%`; if (R.micGain) R.micGain.gain.setTargetAtTime(micPrefs.boost / 100, R.ctx.currentTime, 0.02); saveMic(); };
+  $("mic-pick").onchange = (e) => switchMic(e.target.value).catch(() => { $("mic-state").textContent = "Couldn't open that microphone."; });
+  $("mic-check").onclick = radioCheck;
+  if (!micSetup.watching) { micSetup.watching = true; try { navigator.mediaDevices.addEventListener("devicechange", micList); } catch {} }
+}
+async function radioCheck() {
+  if (R.checking || !R.checkDest) return;
+  const state = $("mic-state"), btn = $("mic-check");
+  R.checking = true; btn.disabled = true;
+  try {
+    const rec = new MediaRecorder(R.checkDest.stream);
+    const chunks = [];
+    rec.ondataavailable = (e) => e.data && e.data.size && chunks.push(e.data);
+    const stopped = new Promise((ok) => (rec.onstop = ok));
+    rec.start();
+    for (let i = 3; i > 0; i--) { state.textContent = `Recording... say "radio check, one two" (${i})`; await new Promise((r) => setTimeout(r, 1000)); }
+    rec.stop(); await stopped;
+    const blob = new Blob(chunks, { type: rec.mimeType || "audio/webm" });
+    R.lastCheckSize = blob.size;
+    state.textContent = "Playing back: this is how you sound on the radio...";
+    const url = URL.createObjectURL(blob), au = new Audio(url);
+    await au.play().catch(() => {});
+    await new Promise((ok) => { au.onended = ok; au.onerror = ok; setTimeout(ok, 6000); });
+    URL.revokeObjectURL(url);
+    state.textContent = "Too quiet? Turn up Boost. Too loud or crackly? Turn it down.";
+  } catch {
+    state.textContent = "The radio check didn't work on this device.";
+  }
+  R.checking = false; btn.disabled = false;
 }
 
 // ---------- voice (Cloudflare Realtime) ----------
@@ -158,11 +241,9 @@ async function startVoice() {
   if (s.t !== "session") throw new Error(s.reason || "No voice session.");
 
   if (R.can.talk.length) {
-    R.mic = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } })
-      .catch(() => { throw new Error("The radio needs your microphone. Allow it in the address bar and try again."); });
-    R.micTrack = R.mic.getAudioTracks()[0];
-    R.micTrack.enabled = false;
-    meter(R.mic);
+    await openMic().catch(() => { throw new Error("The radio needs your microphone. Allow it in the address bar and try again."); });
+    meter(R.micGain);
+    micSetup();
     await serial(async () => {
       const tx = R.pc.addTransceiver(R.micTrack, { direction: "sendonly" });
       await R.pc.setLocalDescription(await R.pc.createOffer());
@@ -399,20 +480,25 @@ function chirp(freq, len = 0.07) {
   o.connect(g).connect(R.ctx.destination); o.start(t); o.stop(t + len + 0.02);
 }
 
-function meter(stream) {
-  const box = $("meter");
+// Mic level: the footer lights while you talk; the Mic check box shows it live.
+function meter(node) {
+  const box = $("meter"), box2 = $("mic-meter");
   box.innerHTML = "<span></span>".repeat(8);
-  if (!stream) { $("foot-text").textContent = "Listen only"; return; }
+  if (box2) box2.innerHTML = "<span></span>".repeat(16);
+  if (!node) { $("foot-text").textContent = "Listen only"; return; }
   const a = R.ctx.createAnalyser(); a.fftSize = 512;
-  R.ctx.createMediaStreamSource(stream).connect(a);
-  const buf = new Float32Array(a.fftSize), bars = [...box.children];
+  node.connect(a);
+  const buf = new Float32Array(a.fftSize), bars = [...box.children], bars2 = box2 ? [...box2.children] : [];
   const tick = () => {
-    if (R.mic !== stream) return;
+    if (R.micGain !== node) return;
     a.getFloatTimeDomainData(buf);
     let peak = 0; for (const v of buf) peak = Math.max(peak, Math.abs(v));
+    R.micPeak = peak;
     const lit = R.tx ? Math.min(8, Math.round(peak * 24)) : 0;
     bars.forEach((b, i) => b.classList.toggle("on", i < lit));
-    requestAnimationFrame(tick);
+    const lit2 = Math.min(16, Math.round(peak * 40));
+    bars2.forEach((b, i) => { b.classList.toggle("on", i < lit2); b.classList.toggle("hot", i >= 13 && i < lit2); });
+    setTimeout(() => requestAnimationFrame(tick), 30);
   };
   tick();
 }
