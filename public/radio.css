@@ -158,3 +158,5 @@ html.kit::-webkit-scrollbar{width:6px}
 html.kit::-webkit-scrollbar-track{background:#0f0f0b}
 html.kit::-webkit-scrollbar-thumb{background:#3a3528;border-radius:3px}
 #hook-state.good{color:var(--olive-light)} #hook-state.bad{color:var(--red)}
+#flash{margin:0 20px 8px;padding:8px 12px;border:1px solid var(--red);border-radius:8px;color:#ffb3ad;font-size:13px}
+body.kit #flash{margin:0 0 8px}

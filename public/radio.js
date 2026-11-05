@@ -18,6 +18,12 @@ const DEFAULTS = {
   allcall: { key: { code: "KeyM" }, pan: 0, vol: 85 },
 };
 const FALLBACK = { key: null, pan: 1, vol: 60 }; // for a net added later
+// In the desktop app, keys work everywhere (even while typing), so start on mouse buttons
+// nobody types with: Mouse 5 = Command, Mouse 4 = All-call. The other nets start unset.
+if (window.dadopsDesktop) {
+  DEFAULTS.command.key = { button: 4 }; DEFAULTS.allcall.key = { button: 3 };
+  DEFAULTS.recon.key = null; DEFAULTS.air.key = null; DEFAULTS.logi.key = null;
+}
 let settings = structuredClone(DEFAULTS);
 try { const s = JSON.parse(localStorage.getItem("dadops-radio") || "null"); if (s) for (const k of Object.keys(s)) settings[k] = { ...(DEFAULTS[k] || FALLBACK), ...(s[k] || {}) }; } catch {}
 // One key per net: if two nets ended up with the same key, the later one loses it.
@@ -106,6 +112,7 @@ async function connect() {
 
 function onMessage(m) {
   if (m.re && R.waiting.has(m.re)) { const w = R.waiting.get(m.re); R.waiting.delete(m.re); return w.ok(m); }
+  if (m.t === "error" && !m.re) { R.lastTalkErr = m.reason; showLastKey(); if (R.tx) { R.tx = null; if (R.micTrack) R.micTrack.enabled = false; render(); } flash(m.reason); return; }
   if (m.t === "roster") { R.roster = m.members; render(); pullAll(); }
   else if (m.t === "talking") {
     const p = R.roster.find((x) => x.conn === m.conn);
@@ -245,8 +252,11 @@ function netForInput(e) { return Object.keys(settings).find((n) => matches(setti
 const typing = () => /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName) && document.activeElement.type !== "range";
 
 window.addEventListener("keydown", (e) => {
-  if (DESK) { // the app's key listener handles talk keys; a key being picked can come from either
-    if (R.capture) { e.preventDefault(); if (e.code === "Escape") endCapture(); else setKey(R.capture, { code: e.code }); }
+  if (DESK) { // the app's key listener handles talk keys; this window's own keys count too (whichever comes first)
+    if (R.capture) { e.preventDefault(); if (e.code === "Escape") endCapture(); else setKey(R.capture, { code: e.code }); return; }
+    if (e.repeat || typing()) return;
+    const n = netForInput(e);
+    if (n && R.can && R.can.talk.includes(n) && Date.now() - (R.capturedAt || 0) > 500) { e.preventDefault(); startTalk(n); }
     return;
   }
   if (R.capture) { e.preventDefault(); if (e.code !== "Escape") setKey(R.capture, { code: e.code }); else endCapture(); return; }
@@ -254,11 +264,14 @@ window.addEventListener("keydown", (e) => {
   const n = netForInput(e);
   if (n && R.can && R.can.talk.includes(n)) { e.preventDefault(); startTalk(n); }
 });
-window.addEventListener("keyup", (e) => { if (DESK) return; const n = netForInput(e); if (n && R.tx === n) stopTalk(); });
+window.addEventListener("keyup", (e) => { const n = netForInput(e); if (n && R.tx === n) stopTalk(); });
 window.addEventListener("mousedown", (e) => {
   if (DESK) {
     if (e.button === 3 || e.button === 4) e.preventDefault();
-    if (R.capture && e.button !== 0 && e.button !== 2) { e.preventDefault(); setKey(R.capture, { button: e.button }); }
+    if (R.capture && e.button !== 0 && e.button !== 2) { e.preventDefault(); setKey(R.capture, { button: e.button }); return; }
+    if (e.button === 0 || e.button === 2) return;
+    const n = netForInput(e);
+    if (n && R.can && R.can.talk.includes(n) && Date.now() - (R.capturedAt || 0) > 500) startTalk(n);
     return;
   }
   if (R.capture && e.button > 0) { e.preventDefault(); return setKey(R.capture, { button: e.button }); }
@@ -266,14 +279,17 @@ window.addEventListener("mousedown", (e) => {
   const n = netForInput(e);
   if (n && R.can && R.can.talk.includes(n)) { e.preventDefault(); startTalk(n); }
 });
-window.addEventListener("mouseup", (e) => { if (e.button === 3 || e.button === 4) e.preventDefault(); if (DESK) return; const n = netForInput(e); if (n && R.tx === n) stopTalk(); });
+window.addEventListener("mouseup", (e) => { if (e.button === 3 || e.button === 4) e.preventDefault(); const n = netForInput(e); if (n && R.tx === n) stopTalk(); });
 window.addEventListener("contextmenu", (e) => { if (R.capture) e.preventDefault(); });
-window.addEventListener("blur", () => { if (!DESK) stopTalk(); }); // in the app the game has focus while you talk
+window.addEventListener("blur", () => { if (!DESK) stopTalk(); });
+// In the app, if a key's release only came through this window and focus moved to the game,
+// the app's key listener still sends the release, so nothing gets stuck. // in the app the game has focus while you talk
 
 // ---------- desktop app ----------
 // Keys and mouse buttons from anywhere in Windows, game included.
 function onDesktopInput(ev) {
   if (!ev || (ev.type !== "down" && ev.type !== "up")) return;
+  R.lastIn = { ev, at: Date.now() }; showLastKey();
   if (R.capture) {
     if (ev.type !== "down") return;
     if (ev.code === "Escape") return endCapture();
@@ -336,7 +352,15 @@ function desktopSetup() {
     $("pda-key").onclick = () => DESK.setPdaKey();
   }
   $("desk").hidden = false;
+  $("last-key").hidden = false; showLastKey();
   $("desk").open = !DESK.kit;
+}
+function showLastKey() {
+  const el = $("last-key"); if (!el) return;
+  if (!R.lastIn) { el.textContent = "Last key from the in-game listener: none yet"; return; }
+  const { ev } = R.lastIn, n = netForInput(ev);
+  el.textContent = `Last key from the in-game listener: ${keyLabel(ev.code ? { code: ev.code } : { button: ev.button })} (${ev.type})` +
+    (n ? ` → ${R.nets[n] ? R.nets[n].name : n}` : " → not a talk key") + (R.lastTalkErr ? ` · ${R.lastTalkErr}` : "");
 }
 function pushOverlay() {
   if (!DESK || !R.me) return;
@@ -357,6 +381,14 @@ function setKey(net, key) {
   S(net).key = key; save(); endCapture();
 }
 function endCapture() { R.capture = null; R.capturedAt = Date.now(); render(); }
+
+// A short message under the header (talk refused, etc.).
+function flash(text) {
+  let f = $("flash");
+  if (!f) { f = document.createElement("div"); f.id = "flash"; f.setAttribute("role", "alert"); $("nets").before(f); }
+  f.textContent = text; f.hidden = false;
+  clearTimeout(flash.t); flash.t = setTimeout(() => (f.hidden = true), 6000);
+}
 
 // ---------- sounds ----------
 function chirp(freq, len = 0.07) {
