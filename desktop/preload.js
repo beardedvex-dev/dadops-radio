@@ -10,4 +10,6 @@ contextBridge.exposeInMainWorld("dadopsDesktop", {
   setPrefs: (p) => ipcRenderer.invoke("dadops:prefs:set", p),
   onPrefs: (fn) => ipcRenderer.on("dadops:prefs", (_e, p) => fn(p)),
   installUpdate: () => ipcRenderer.send("dadops:install-update"),
+  pda: (show) => ipcRenderer.send("dadops:pda", show),
+  setPdaKey: () => ipcRenderer.send("dadops:pda-key"),
 });

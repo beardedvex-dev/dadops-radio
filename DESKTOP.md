@@ -97,6 +97,26 @@ Each build needs a new version number. Claude bumps it in
   can draw over exclusive Fullscreen. Most games call it "Borderless",
   "Windowed Fullscreen" or "Fullscreen (Windowed)".
 
+## The Field PDA (from v0.2.0)
+
+Press **F9** anywhere, even in-game, to pop up the **Field PDA**
+(dadops.gg/pda) on top of the game. Press it again to hide it. The radio keeps
+running the whole time, and your talk keys still work while it's open.
+
+- Change the key in the **Desktop app** box → **Show/hide key** → press the
+  new key (Esc cancels). If a net was using that key, the net gives it up.
+- **Open Field PDA** button there, or right-click the tray icon.
+- The PDA window remembers its size and position. Drag it to a second
+  monitor if you have one.
+- The first time, sign in to dadops.gg in the PDA window (same Discord).
+
+## Updating
+
+The app checks for updates when it starts and every 6 hours. When a new
+version has downloaded, the **Desktop app** box shows **Update ready** with a
+**Restart now** button (also in the tray menu). Or just quit and reopen; it
+updates on the way out.
+
 ## Trying it in-game
 
 Quickest test on your own:

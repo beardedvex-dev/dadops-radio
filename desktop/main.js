@@ -18,10 +18,12 @@ const { keyFromHook, buttonFromHook } = require("./keys");
 const CONFIG = JSON.parse(fs.readFileSync(path.join(__dirname, "config.json"), "utf8"));
 const RADIO_URL = (process.env.DADOPS_RADIO_URL || CONFIG.radioUrl).replace(/\/+$/, "");
 const RADIO_ORIGIN = new URL(RADIO_URL).origin;
+const PDA_URL = CONFIG.pdaUrl || "https://dadops.gg/pda";
+const PDA_ORIGIN = new URL(PDA_URL).origin;
 const ICON = path.join(__dirname, "build", "icon.png");
 
 // Sign-in passes through Discord and Supabase; everything else opens in the real browser.
-const ALLOWED = [RADIO_ORIGIN, "https://discord.com", "https://canary.discord.com", "https://ptb.discord.com"];
+const ALLOWED = [RADIO_ORIGIN, PDA_ORIGIN, "https://discord.com", "https://canary.discord.com", "https://ptb.discord.com"];
 const allowed = (url) => {
   try { const u = new URL(url); return ALLOWED.includes(u.origin) || /\.supabase\.co$/.test(u.hostname); } catch { return false; }
 };
@@ -37,11 +39,11 @@ if (!app.requestSingleInstanceLock()) { app.quit(); }
 
 // ---------- saved settings ----------
 const PREFS_FILE = () => path.join(app.getPath("userData"), "prefs.json");
-let prefs = { overlay: true, startWithWindows: false };
+let prefs = { overlay: true, startWithWindows: false, pdaKey: { code: "F9" }, pdaBounds: null };
 function loadPrefs() { try { prefs = { ...prefs, ...JSON.parse(fs.readFileSync(PREFS_FILE(), "utf8")) }; } catch {} }
 function savePrefs() { try { fs.writeFileSync(PREFS_FILE(), JSON.stringify(prefs, null, 2)); } catch {} }
 
-let win = null, overlay = null, tray = null, quitting = false, lastOverlay = null, update = null;
+let win = null, overlay = null, pda = null, tray = null, quitting = false, lastOverlay = null, update = null, capturingPda = false;
 
 function createWindow(startHidden) {
   win = new BrowserWindow({
@@ -85,6 +87,35 @@ function showOverlay() {
   if (lastOverlay) overlay.webContents.send("dadops:overlay-state", lastOverlay);
 }
 
+// ---------- the Field PDA (dadops.gg/pda) in its own window ----------
+function createPda() {
+  const b = prefs.pdaBounds || {};
+  pda = new BrowserWindow({
+    width: b.width || 1180, height: b.height || 760, x: b.x, y: b.y, minWidth: 380, minHeight: 480,
+    title: "DAD Ops Field PDA", icon: ICON, backgroundColor: "#0E0E0B", autoHideMenuBar: true, show: false,
+    webPreferences: { contextIsolation: true, sandbox: true },
+  });
+  pda.setMenuBarVisibility(false);
+  pda.setAlwaysOnTop(true, "screen-saver");
+  pda.loadURL(PDA_URL);
+  pda.webContents.setWindowOpenHandler(({ url }) => {
+    if (allowed(url) && new URL(url).origin === PDA_ORIGIN) { pda.loadURL(url); return { action: "deny" }; }
+    if (/^https?:/.test(url)) shell.openExternal(url);
+    return { action: "deny" };
+  });
+  pda.webContents.on("will-navigate", (e, url) => { if (!allowed(url)) { e.preventDefault(); if (/^https?:/.test(url)) shell.openExternal(url); } });
+  const keep = () => { if (!pda.isMinimized() && !pda.isMaximized()) { prefs.pdaBounds = pda.getBounds(); savePrefs(); } };
+  pda.on("moved", keep); pda.on("resized", keep);
+  pda.on("close", (e) => { if (!quitting) { e.preventDefault(); pda.hide(); } });
+  pda.on("app-command", (e) => e.preventDefault());
+}
+function togglePda(force) {
+  if (!pda || pda.isDestroyed()) createPda();
+  const show = force === undefined ? !pda.isVisible() : force;
+  if (show) { pda.show(); pda.focus(); } else pda.hide();
+}
+const pdaKeyMatches = (ev) => { const k = prefs.pdaKey; return !!k && ((k.code && ev.code === k.code) || (k.button != null && ev.button === k.button)); };
+
 function applyStartWithWindows() {
   try { app.setLoginItemSettings({ openAtLogin: !!prefs.startWithWindows, args: ["--hidden"] }); } catch {}
 }
@@ -94,6 +125,7 @@ function buildTray() {
   tray.setToolTip("DAD Ops Radio");
   const menu = () => Menu.buildFromTemplate([
     { label: "Open DAD Ops Radio", click: () => { win.show(); win.focus(); } },
+    { label: `Field PDA (${keyName(prefs.pdaKey)})`, click: () => togglePda(true) },
     { type: "separator" },
     { label: "Show overlay in-game", type: "checkbox", checked: prefs.overlay, click: (m) => { prefs.overlay = m.checked; savePrefs(); showOverlay(); sendPrefs(); } },
     { label: "Start with Windows", type: "checkbox", checked: prefs.startWithWindows, click: (m) => { prefs.startWithWindows = m.checked; savePrefs(); applyStartWithWindows(); sendPrefs(); } },
@@ -106,8 +138,17 @@ function buildTray() {
   tray.refresh = () => tray.setContextMenu(menu());
 }
 
+function publicPrefs() {
+  return { overlay: prefs.overlay, startWithWindows: prefs.startWithWindows, pdaKey: prefs.pdaKey, capturingPda, version: app.getVersion(), update };
+}
+function keyName(k) {
+  if (!k) return "no key";
+  if (k.button != null) return `Mouse ${k.button + 1}`;
+  return String(k.code || "").replace(/^Key/, "").replace(/^Digit/, "");
+}
+
 function sendPrefs() {
-  if (win && !win.isDestroyed()) win.webContents.send("dadops:prefs", { ...prefs, version: app.getVersion(), update });
+  if (win && !win.isDestroyed()) win.webContents.send("dadops:prefs", publicPrefs());
   if (tray && tray.refresh) tray.refresh();
 }
 
@@ -116,11 +157,24 @@ function startHook() {
   let hook;
   try { hook = require("uiohook-napi").uIOhook; } catch (e) { console.error("Global keys unavailable:", e.message); return; }
   const down = new Set();
-  const send = (ev) => { if (win && !win.isDestroyed()) win.webContents.send("dadops:input", ev); };
+  const deliver = (ev) => { if (win && !win.isDestroyed()) win.webContents.send("dadops:input", ev); };
+  // The Field PDA key opens/closes the PDA and is kept away from the radio's talk keys.
+  const send = (ev) => {
+    if (capturingPda) {
+      if (ev.type !== "down") return;
+      capturingPda = false;
+      if (ev.code !== "Escape") { prefs.pdaKey = ev.code ? { code: ev.code } : { button: ev.button }; savePrefs(); }
+      sendPrefs();
+      return;
+    }
+    if (pdaKeyMatches(ev)) { if (ev.type === "down") togglePda(); return; }
+    deliver(ev);
+  };
   hook.on("keydown", (e) => { const k = keyFromHook(e.keycode); if (down.has(k)) return; down.add(k); send({ type: "down", code: k }); });
   hook.on("keyup", (e) => { const k = keyFromHook(e.keycode); down.delete(k); send({ type: "up", code: k }); });
   hook.on("mousedown", (e) => { const b = buttonFromHook(e.button); if (b == null || b === 0 || b === 2) return; send({ type: "down", button: b }); });
   hook.on("mouseup", (e) => { const b = buttonFromHook(e.button); if (b == null || b === 0 || b === 2) return; send({ type: "up", button: b }); });
+  if (process.env.DADOPS_TEST === "1") global.__dadopsHook = hook; // lets the automated tests press keys
   try { hook.start(); } catch (e) { console.error("Global keys failed to start:", e.message); }
   app.on("will-quit", () => { try { hook.stop(); } catch {} });
 }
@@ -148,15 +202,17 @@ ipcMain.on("dadops:overlay", (e, state) => {
   lastOverlay = state;
   showOverlay();
 });
-ipcMain.handle("dadops:prefs:get", (e) => (fromRadio(e) ? { ...prefs, version: app.getVersion(), update } : null));
+ipcMain.handle("dadops:prefs:get", (e) => (fromRadio(e) ? publicPrefs() : null));
 ipcMain.handle("dadops:prefs:set", (e, p) => {
   if (!fromRadio(e) || !p || typeof p !== "object") return null;
   if ("overlay" in p) prefs.overlay = !!p.overlay;
   if ("startWithWindows" in p) { prefs.startWithWindows = !!p.startWithWindows; applyStartWithWindows(); }
   savePrefs(); showOverlay(); sendPrefs();
-  return { ...prefs, version: app.getVersion(), update };
+  return publicPrefs();
 });
 ipcMain.on("dadops:install-update", (e) => { if (fromRadio(e) && update) installUpdate(); });
+ipcMain.on("dadops:pda", (e, show) => { if (fromRadio(e)) togglePda(show === undefined ? undefined : !!show); });
+ipcMain.on("dadops:pda-key", (e) => { if (fromRadio(e)) { capturingPda = true; sendPrefs(); } });
 
 app.on("second-instance", () => { if (win) { win.show(); win.focus(); } });
 app.on("before-quit", () => { quitting = true; });

@@ -1,7 +1,7 @@
 {
   "name": "dadops-radio-desktop",
   "productName": "DAD Ops Radio",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "DAD Ops Radio for Windows: talk keys that work in-game, plus an overlay",
   "author": "DAD Ops",
   "private": true,

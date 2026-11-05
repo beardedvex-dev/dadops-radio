@@ -290,6 +290,15 @@ function desktopSetup() {
     $("opt-startup").checked = !!p.startWithWindows;
     $("app-version").textContent = p.version ? `v${p.version}` : "";
     $("update").hidden = !p.update;
+    if (DESK.pda && p.pdaKey !== undefined) {
+      $("pda-row").hidden = false;
+      $("pda-key").textContent = p.capturingPda ? "PRESS A KEY" : keyLabel(p.pdaKey);
+      $("pda-key").classList.toggle("wait", !!p.capturingPda);
+      // The PDA key can't also be a talk key: the app keeps it for the PDA.
+      let cleared = false;
+      for (const n of Object.keys(settings)) if (p.pdaKey && JSON.stringify(settings[n].key) === JSON.stringify(p.pdaKey)) { settings[n].key = null; cleared = true; }
+      if (cleared) { save(); render(); }
+    }
     if (p.update) $("update-text").textContent = `Update ready (v${p.update}).`;
   };
   DESK.getPrefs().then(apply).catch(() => {});
@@ -297,6 +306,10 @@ function desktopSetup() {
   $("opt-overlay").onchange = (e) => DESK.setPrefs({ overlay: e.target.checked }).then(apply);
   $("opt-startup").onchange = (e) => DESK.setPrefs({ startWithWindows: e.target.checked }).then(apply);
   $("update-now").onclick = () => DESK.installUpdate();
+  if (DESK.pda) {
+    $("pda-open").onclick = () => DESK.pda(true);
+    $("pda-key").onclick = () => DESK.setPdaKey();
+  }
   $("desk").hidden = false;
 }
 function pushOverlay() {

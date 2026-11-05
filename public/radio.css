@@ -85,3 +85,4 @@ button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid var(-
 .opt input{width:18px;height:18px;accent-color:var(--tan)}
 .update{display:flex;align-items:center;gap:10px;justify-content:space-between;font-size:14px;color:var(--tan)}
 body.desktop .test-tag{display:none}
+.pda-row{flex-wrap:wrap;gap:10px}
