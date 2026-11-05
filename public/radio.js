@@ -219,10 +219,11 @@ function mix() {
 }
 
 function myNets() { const me = R.roster.find((x) => x.conn === R.conn); return me ? me.nets : []; }
+function myMonitor() { const me = R.roster.find((x) => x.conn === R.conn); return (me && me.monitor) || []; }
 
 // ---------- talking ----------
 function startTalk(net) {
-  if (R.tx || !R.micTrack || !R.can.talk.includes(net) || !myNets().includes(net)) return;
+  if (R.tx || !R.micTrack || !R.can.talk.includes(net) || !myNets().includes(net) || myMonitor().includes(net)) return;
   R.tx = net;
   R.micTrack.enabled = true;
   tell({ t: "talk", net });
@@ -290,6 +291,11 @@ function desktopSetup() {
     $("opt-startup").checked = !!p.startWithWindows;
     $("app-version").textContent = p.version ? `v${p.version}` : "";
     $("update").hidden = !p.update;
+    if (DESK.checkUpdates && p.canCheck !== undefined) {
+      $("upd-line").hidden = !!p.update;
+      $("upd-state").textContent = p.updState || "";
+      $("upd-check").hidden = !p.canCheck;
+    }
     if (DESK.pda && p.pdaKey !== undefined) {
       $("pda-row").hidden = false;
       $("pda-key").textContent = p.capturingPda ? "PRESS A KEY" : keyLabel(p.pdaKey);
@@ -306,6 +312,7 @@ function desktopSetup() {
   $("opt-overlay").onchange = (e) => DESK.setPrefs({ overlay: e.target.checked }).then(apply);
   $("opt-startup").onchange = (e) => DESK.setPrefs({ startWithWindows: e.target.checked }).then(apply);
   $("update-now").onclick = () => DESK.installUpdate();
+  if (DESK.checkUpdates) $("upd-check").onclick = () => DESK.checkUpdates();
   if (DESK.pda) {
     $("pda-open").onclick = () => DESK.pda(true);
     $("pda-key").onclick = () => DESK.setPdaKey();
@@ -381,6 +388,9 @@ function buildNets() {
       <div class="speaking" data-r="speaking" hidden></div>
       <div class="people" data-r="people"></div>
       <div class="controls" data-r="controls">
+        ${net.joinable ? `<div class="seg" role="group" aria-label="${esc(net.name)} talk or monitor" data-r="mode">
+          <button data-mode="talk">Talk</button><button data-mode="monitor">Monitor</button>
+        </div>` : ""}
         <div class="seg" role="group" aria-label="${esc(net.name)} ear">
           <button data-pan="-1">Left</button><button data-pan="0">Both</button><button data-pan="1">Right</button>
         </div>
@@ -388,15 +398,21 @@ function buildNets() {
         ${net.joinable ? '<button class="ghost small" data-r="leave">Leave</button>' : ""}
       </div>
       <button class="ptt" data-r="ptt" hidden></button>
-      <button class="join" data-r="join" hidden>Join net</button>`;
+      <div class="joinrow" data-r="joinrow" hidden>
+        <button class="join" data-r="join">Join net</button>
+        <button class="ghost small" data-r="monitor" title="Listen to this net without talking on it">Monitor only</button>
+      </div>`;
     const q = (r) => el.querySelector(`[data-r="${r}"]`);
     el.querySelectorAll("[data-pan]").forEach((b) => (b.onclick = () => { S(key).pan = +b.dataset.pan; save(); render(); mix(); }));
     q("vol").value = S(key).vol;
     q("vol").oninput = (e) => { S(key).vol = +e.target.value; save(); mix(); };
     // Use our own nets from the answer straight away, so a talk key works the moment you join.
-    const setMine = (r) => { const me = R.roster.find((x) => x.conn === R.conn); if (me && r.nets) { me.nets = r.nets; render(); } };
+    const setMine = (r) => { const me = R.roster.find((x) => x.conn === R.conn); if (me && r.nets) { me.nets = r.nets; me.monitor = r.monitor || []; render(); } };
+    const joinAs = (mode) => { if (mode === "monitor" && R.tx === key) stopTalk(true); return ask({ t: "join", net: key, mode }).then((r) => { if (r.t === "error") alertIn(el, r.reason); else setMine(r); }).catch(() => {}); };
     if (q("leave")) q("leave").onclick = () => { if (R.tx === key) stopTalk(true); ask({ t: "leave", net: key }).then(setMine).catch(() => {}); };
-    q("join").onclick = () => ask({ t: "join", net: key }).then((r) => { if (r.t === "error") alertIn(el, r.reason); else setMine(r); }).catch(() => {});
+    q("join").onclick = () => joinAs("talk");
+    q("monitor").onclick = () => joinAs("monitor");
+    el.querySelectorAll("[data-mode]").forEach((b) => (b.onclick = () => joinAs(b.dataset.mode)));
     const ptt = q("ptt");
     ptt.onpointerdown = (e) => { e.preventDefault(); ptt.setPointerCapture(e.pointerId); startTalk(key); };
     ptt.onpointerup = ptt.onpointercancel = () => { if (R.tx === key) stopTalk(); };
@@ -422,6 +438,7 @@ function render() {
     const net = R.nets[key];
     const joined = mine.includes(key);
     const canListen = R.can.listen.includes(key), canTalk = R.can.talk.includes(key);
+    const monitoring = joined && myMonitor().includes(key), talkHere = canTalk && joined && !monitoring;
     const on = R.roster.filter((p) => p.nets.includes(key));
     const talker = on.find((p) => p.talking === key);
     el.classList.toggle("joined", joined);
@@ -429,15 +446,16 @@ function render() {
 
     q("count").textContent = `${on.length} on net`;
     const keybox = q("keybox");
-    if (canTalk && joined) {
+    if (talkHere) {
       const waiting = R.capture === key;
       keybox.innerHTML = `<button class="key ${waiting ? "wait" : ""}" title="Change this net's talk key">${waiting ? "PRESS A KEY" : esc(keyLabel(S(key).key))}</button>`;
       keybox.firstChild.onclick = (e) => { e.stopPropagation(); R.capture = R.capture === key ? null : key; render(); };
-    } else keybox.innerHTML = canListen && !canTalk && joined ? '<span class="count">Listen only</span>' : "";
+    } else keybox.innerHTML = monitoring ? '<span class="tag">MONITORING</span>' : canListen && !canTalk && joined ? '<span class="count">Listen only</span>' : "";
 
     const desc = q("desc");
     if (!canListen) desc.textContent = `${net.name} opens at Private.`;
     else if (!joined) desc.textContent = net.desc || "";
+    else if (monitoring) desc.textContent = "Monitoring: you hear this net but can't talk on it. Switch to Talk to speak up.";
     else if (!net.joinable) desc.textContent = canTalk ? "You can talk to everyone on the radio. Use it sparingly." : (net.desc || "");
     else desc.textContent = "";
 
@@ -447,19 +465,23 @@ function render() {
       sp.innerHTML = talker.conn === R.conn ? `<b>You</b> are talking` : `<b>${esc(talker.callsign)}</b> is talking`;
     } else sp.hidden = true;
 
-    q("people").innerHTML = joined ? on.map((p) => `<span class="chip ${p.talking === key ? "on" : ""}">${esc(p.callsign)}${p.conn === R.conn ? " (you)" : ""}</span>`).join("") : "";
+    q("people").innerHTML = joined ? on.map((p) => { const mon = (p.monitor || []).includes(key);
+      return `<span class="chip ${p.talking === key ? "on" : ""} ${mon ? "mon" : ""}" ${mon ? 'title="Monitoring (listen only)"' : ""}>${esc(p.callsign)}${p.conn === R.conn ? " (you)" : ""}${mon ? " · listening" : ""}</span>`; }).join("") : "";
+    const mode = q("mode");
+    if (mode) { mode.hidden = !(joined && canTalk); mode.querySelectorAll("[data-mode]").forEach((b) => b.setAttribute("aria-pressed", String((b.dataset.mode === "monitor") === monitoring))); }
     q("controls").hidden = !joined;
     el.querySelectorAll("[data-pan]").forEach((b) => b.setAttribute("aria-pressed", String(+b.dataset.pan === S(key).pan)));
-    q("join").hidden = joined || !canListen || !net.joinable;
+    q("joinrow").hidden = joined || !canListen || !net.joinable;
+    q("monitor").hidden = !canTalk;
     const ptt = q("ptt");
-    ptt.hidden = !(joined && canTalk);
+    ptt.hidden = !talkHere;
     ptt.classList.toggle("tx", R.tx === key);
     ptt.textContent = R.tx === key ? `Talking on ${net.name}` : `Hold to talk on ${net.name}  ·  ${keyLabel(S(key).key)}`;
   }
 
   const foot = document.querySelector(".foot");
   foot.classList.toggle("tx", !!R.tx);
-  const first = R.can.talk.find((n) => mine.includes(n));
+  const first = R.can.talk.find((n) => mine.includes(n) && !myMonitor().includes(n));
   $("foot-text").textContent = !R.micTrack ? "Listen only" : R.tx ? `Talking on ${R.nets[R.tx].name}` :
     first ? `Hold ${keyLabel(S(first).key)} to talk on ${R.nets[first].name}` : "Join a net to talk";
   mix();

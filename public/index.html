@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>DAD Ops Radio · Test</title>
+<title>DAD Ops Radio</title>
 <meta name="robots" content="noindex">
 <link rel="icon" type="image/png" href="/patch.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -15,7 +15,6 @@
   <header class="bar">
     <img src="/patch.png" alt="" width="28" height="28">
     <span class="brand">DAD OPS RADIO</span>
-    <span class="test-tag">BROWSER TEST</span>
     <span class="grow"></span>
     <button id="signout" class="ghost small" hidden>Sign out</button>
   </header>
@@ -71,6 +70,7 @@
         <span class="muted">Show/hide key</span>
         <button class="key" id="pda-key" title="Change the Field PDA key">F9</button>
       </div>
+      <div class="update-line" id="upd-line" hidden><span class="muted" id="upd-state"></span><button class="ghost small" id="upd-check">Check for updates</button></div>
       <div id="update" class="update" hidden><span id="update-text"></span><button id="update-now" class="join">Restart now</button></div>
       <p class="muted">Closing this window keeps the radio running in the tray (bottom right, by the clock). Right-click the DAD Ops patch there to quit.</p>
     </div>

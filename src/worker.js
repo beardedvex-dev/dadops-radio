@@ -163,7 +163,7 @@ export class Radio {
   roster() {
     return this.members().map(({ a }) => ({
       id: a.me.id, conn: a.conn, callsign: a.me.callsign, rank: a.me.rank || null, level: a.me.level, staff: a.me.staff,
-      squadLeader: a.me.squadLeader, nets: a.nets, talking: a.talking || null,
+      squadLeader: a.me.squadLeader, nets: a.nets, monitor: a.monitor || [], talking: a.talking || null,
       published: !!(a.sessionId && a.trackName),
     }));
   }
@@ -208,12 +208,17 @@ export class Radio {
         const net = msg.net;
         if (!NETS[net] || !NETS[net].joinable) return reply({ t: "error", reason: "That net can't be joined or left." });
         if (msg.t === "join" && !a.can.listen.includes(net)) return reply({ t: "error", reason: `${NETS[net].name} opens at Private.` });
-        const nets = new Set(a.nets);
-        msg.t === "join" ? nets.add(net) : nets.delete(net);
+        // mode "monitor" = listen only on that net; "talk" (or none) = listen and talk.
+        const nets = new Set(a.nets), mon = new Set(a.monitor || []);
+        if (msg.t === "join") { nets.add(net); msg.mode === "monitor" ? mon.add(net) : mon.delete(net); }
+        else { nets.delete(net); mon.delete(net); }
         a.nets = Object.keys(NETS).filter((n) => nets.has(n));
-        if (a.talking && !a.nets.includes(a.talking)) a.talking = null;
+        a.monitor = a.nets.filter((n) => mon.has(n));
+        let stopped = false;
+        if (a.talking && (!a.nets.includes(a.talking) || a.monitor.includes(a.talking))) { a.talking = null; stopped = true; }
         ws.serializeAttachment(a);
-        reply({ t: "ok", nets: a.nets });
+        reply({ t: "ok", nets: a.nets, monitor: a.monitor });
+        if (stopped) this.broadcast({ t: "talking", conn: a.conn, net: null });
         this.pushRoster();
         return;
       }
@@ -221,6 +226,7 @@ export class Radio {
       if (msg.t === "talk") {
         const net = msg.net || null;
         if (net && (!a.can.talk.includes(net) || !a.nets.includes(net))) return reply({ t: "error", reason: "You can't talk on that net." });
+        if (net && (a.monitor || []).includes(net)) return reply({ t: "error", reason: "You're only monitoring that net." });
         if (net && !(a.sessionId && a.trackName)) return reply({ t: "error", reason: "Your mic isn't connected yet." });
         if ((a.talking || null) === net) return;
         a.talking = net;

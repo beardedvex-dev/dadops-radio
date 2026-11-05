@@ -43,6 +43,7 @@ let prefs = { overlay: true, startWithWindows: false, pdaKey: { code: "F9" }, pd
 function loadPrefs() { try { prefs = { ...prefs, ...JSON.parse(fs.readFileSync(PREFS_FILE(), "utf8")) }; } catch {} }
 function savePrefs() { try { fs.writeFileSync(PREFS_FILE(), JSON.stringify(prefs, null, 2)); } catch {} }
 
+let updState = "", checkNow = null;
 let win = null, overlay = null, pda = null, tray = null, quitting = false, lastOverlay = null, update = null, capturingPda = false;
 
 function createWindow(startHidden) {
@@ -129,7 +130,8 @@ function buildTray() {
     { type: "separator" },
     { label: "Show overlay in-game", type: "checkbox", checked: prefs.overlay, click: (m) => { prefs.overlay = m.checked; savePrefs(); showOverlay(); sendPrefs(); } },
     { label: "Start with Windows", type: "checkbox", checked: prefs.startWithWindows, click: (m) => { prefs.startWithWindows = m.checked; savePrefs(); applyStartWithWindows(); sendPrefs(); } },
-    ...(update ? [{ type: "separator" }, { label: `Restart to update (v${update})`, click: () => installUpdate() }] : []),
+    { type: "separator" },
+    update ? { label: `Restart to update (v${update})`, click: () => installUpdate() } : { label: "Check for updates", enabled: !!checkNow, click: () => checkNow && checkNow() },
     { type: "separator" },
     { label: "Quit", click: () => { quitting = true; app.quit(); } },
   ]);
@@ -139,7 +141,7 @@ function buildTray() {
 }
 
 function publicPrefs() {
-  return { overlay: prefs.overlay, startWithWindows: prefs.startWithWindows, pdaKey: prefs.pdaKey, capturingPda, version: app.getVersion(), update };
+  return { overlay: prefs.overlay, startWithWindows: prefs.startWithWindows, pdaKey: prefs.pdaKey, capturingPda, version: app.getVersion(), update, updState, canCheck: !!checkNow };
 }
 function keyName(k) {
   if (!k) return "no key";
@@ -186,9 +188,15 @@ function startUpdates() {
   try { au = require("electron-updater").autoUpdater; } catch { return; }
   au.autoDownload = true;
   au.autoInstallOnAppQuit = true;
-  au.on("update-downloaded", (info) => { update = info.version; sendPrefs(); });
-  au.on("error", () => {});
+  const say = (t) => { updState = t; sendPrefs(); };
+  au.on("checking-for-update", () => say("Checking for updates..."));
+  au.on("update-not-available", () => say("Up to date"));
+  au.on("update-available", (info) => say(`Downloading v${info.version}...`));
+  au.on("download-progress", (p) => say(`Downloading update: ${Math.round(p.percent || 0)}%`));
+  au.on("update-downloaded", (info) => { update = info.version; say(""); });
+  au.on("error", () => say("Couldn't check for updates (will try again later)"));
   const check = () => au.checkForUpdates().catch(() => {});
+  checkNow = check;
   check();
   setInterval(check, 6 * 3600e3);
 }
@@ -211,6 +219,7 @@ ipcMain.handle("dadops:prefs:set", (e, p) => {
   return publicPrefs();
 });
 ipcMain.on("dadops:install-update", (e) => { if (fromRadio(e) && update) installUpdate(); });
+ipcMain.on("dadops:check-updates", (e) => { if (fromRadio(e) && checkNow) checkNow(); });
 ipcMain.on("dadops:pda", (e, show) => { if (fromRadio(e)) togglePda(show === undefined ? undefined : !!show); });
 ipcMain.on("dadops:pda-key", (e) => { if (fromRadio(e)) { capturingPda = true; sendPrefs(); } });
 
