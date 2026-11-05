@@ -245,7 +245,10 @@ function netForInput(e) { return Object.keys(settings).find((n) => matches(setti
 const typing = () => /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName) && document.activeElement.type !== "range";
 
 window.addEventListener("keydown", (e) => {
-  if (DESK) { if (R.capture) e.preventDefault(); return; }
+  if (DESK) { // the app's key listener handles talk keys; a key being picked can come from either
+    if (R.capture) { e.preventDefault(); if (e.code === "Escape") endCapture(); else setKey(R.capture, { code: e.code }); }
+    return;
+  }
   if (R.capture) { e.preventDefault(); if (e.code !== "Escape") setKey(R.capture, { code: e.code }); else endCapture(); return; }
   if (e.repeat || typing()) return;
   const n = netForInput(e);
@@ -253,7 +256,11 @@ window.addEventListener("keydown", (e) => {
 });
 window.addEventListener("keyup", (e) => { if (DESK) return; const n = netForInput(e); if (n && R.tx === n) stopTalk(); });
 window.addEventListener("mousedown", (e) => {
-  if (DESK) { if (e.button === 3 || e.button === 4) e.preventDefault(); return; }
+  if (DESK) {
+    if (e.button === 3 || e.button === 4) e.preventDefault();
+    if (R.capture && e.button !== 0 && e.button !== 2) { e.preventDefault(); setKey(R.capture, { button: e.button }); }
+    return;
+  }
   if (R.capture && e.button > 0) { e.preventDefault(); return setKey(R.capture, { button: e.button }); }
   if (e.button === 0) return;
   const n = netForInput(e);
@@ -276,6 +283,8 @@ function onDesktopInput(ev) {
   }
   const n = netForInput(ev);
   if (!n || !R.can) return;
+  // The same press that just set a key also arrives here a moment later: don't talk on it.
+  if (ev.type === "down" && Date.now() - (R.capturedAt || 0) < 500) return;
   if (ev.type === "down") { if (R.can.talk.includes(n)) startTalk(n); }
   else if (R.tx === n) stopTalk();
 }
@@ -291,6 +300,13 @@ function desktopSetup() {
     $("opt-overlay").checked = !!p.overlay;
     $("opt-startup").checked = !!p.startWithWindows;
     $("app-version").textContent = p.version ? `v${p.version}` : "";
+    if (p.hookState !== undefined) {
+      const heard = p.hookLast && Date.now() - p.hookLast < 10 * 60e3;
+      $("hook-state").hidden = false;
+      $("hook-state").textContent = /^failed/.test(p.hookState) ? `In-game keys: NOT WORKING (${p.hookState.replace(/^failed:\s*/, "")})`
+        : heard ? "In-game keys: working" : p.hookState === "running" ? "In-game keys: listening (press any key to check)" : "In-game keys: starting...";
+      $("hook-state").className = "muted " + (/^failed/.test(p.hookState) ? "bad" : heard ? "good" : "");
+    }
     $("kit-ver").textContent = p.version ? `· v${p.version}` : "";
     $("update").hidden = !p.update;
     if (DESK.checkUpdates && p.canCheck !== undefined) {
@@ -336,10 +352,11 @@ function pushOverlay() {
 }
 
 function setKey(net, key) {
+  if (!R.capture || R.capture !== net) return; // already set by the other path
   for (const n of Object.keys(settings)) if (n !== net && JSON.stringify(settings[n].key) === JSON.stringify(key)) settings[n].key = null;
   S(net).key = key; save(); endCapture();
 }
-function endCapture() { R.capture = null; render(); }
+function endCapture() { R.capture = null; R.capturedAt = Date.now(); render(); }
 
 // ---------- sounds ----------
 function chirp(freq, len = 0.07) {

@@ -51,6 +51,7 @@ function loadPrefs() { try { prefs = { ...prefs, ...JSON.parse(fs.readFileSync(P
 function savePrefs() { try { fs.writeFileSync(PREFS_FILE(), JSON.stringify(prefs, null, 2)); } catch {} }
 
 let updState = "", checkNow = null;
+let hookState = "starting", hookLast = 0; // the in-game key listener: starting / running / failed
 let kit = null, shellView = null, radioView = null, pdaView = null, overlay = null, tray = null;
 let quitting = false, lastOverlay = null, update = null, capturingPda = false, unfolded = false, overGame = false;
 
@@ -252,7 +253,7 @@ function buildTray() {
 
 function publicPrefs() {
   return { overlay: prefs.overlay, startWithWindows: prefs.startWithWindows, pdaKey: prefs.pdaKey, capturingPda, unfolded,
-    version: app.getVersion(), update, updState, canCheck: !!checkNow };
+    version: app.getVersion(), update, updState, canCheck: !!checkNow, hookState, hookLast };
 }
 function keyName(k) {
   if (!k) return "no key";
@@ -268,11 +269,14 @@ function sendPrefs() {
 // ---------- talk keys (and the kit key) that work in-game ----------
 function startHook() {
   let hook;
-  try { hook = require("uiohook-napi").uIOhook; } catch (e) { console.error("Global keys unavailable:", e.message); return; }
+  try { hook = require("uiohook-napi").uIOhook; } catch (e) { console.error("Global keys unavailable:", e.message); hookState = "failed: " + e.message; return; }
   const down = new Set();
   const deliver = (ev) => { if (radioView) radioView.webContents.send("dadops:input", ev); };
   // The kit key (F9) opens/closes the kit and is kept away from the radio's talk keys.
+  let told = 0;
   const send = (ev) => {
+    hookLast = Date.now();
+    if (hookLast - told > 5000) { told = hookLast; sendPrefs(); } // let the page show "hearing keys"
     if (capturingPda) {
       if (ev.type !== "down") return;
       capturingPda = false;
@@ -291,8 +295,10 @@ function startHook() {
     global.__dadopsHook = hook;
     global.__kitState = () => ({ visible: kit.isVisible(), unfolded, onTop: kit.isAlwaysOnTop(), width: kit.getBounds().width, pda: !!pdaView });
     global.__kitShow = () => showKit({});
+    global.__kitMin = () => kit.isMinimized() || process.platform === "linux"; // Xvfb has no taskbar to minimize to
   }
-  try { hook.start(); } catch (e) { console.error("Global keys failed to start:", e.message); }
+  try { hook.start(); hookState = "running"; } catch (e) { console.error("Global keys failed to start:", e.message); hookState = "failed: " + e.message; }
+  sendPrefs();
   app.on("will-quit", () => { try { hook.stop(); } catch {} });
 }
 
