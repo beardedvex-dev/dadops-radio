@@ -14,7 +14,11 @@
 //    SUPABASE_URL, SUPABASE_KEY  the same public values as dadops.gg
 //    REALTIME_APP_ID             (secret) from Cloudflare > Realtime > SFU
 //    REALTIME_APP_SECRET         (secret) from the same place
-//    SFU_BASE                    optional, only changed for local tests
+//    DISCORD_BOT_TOKEN           (secret, optional) Maj. Horton's bot token, to show
+//                                which Discord voice channel each person is in
+//    DISCORD_RALLY_POINT_ID      (secret, optional) The Rally Point's channel ID
+//                                (how the radio finds the DAD Ops server)
+//    SFU_BASE, DISCORD_API       optional, only changed for local tests
 // =====================================================================
 
 // The nets, in the order they show. To add one: copy a line, give it a new
@@ -104,7 +108,20 @@ export async function whoIs(env, token, now = Date.now()) {
     }
   }
 
-  return { id: user.id, callsign, rank, level, staff, squadLeader, tonight };
+  // Their Discord account ID (from the Discord sign-in), for the voice channel lookup.
+  const ident = (user.identities || []).find((i) => i.provider === "discord");
+  const discordId = String((ident && ident.identity_data && (ident.identity_data.provider_id || ident.identity_data.sub)) ||
+    (user.user_metadata && (user.user_metadata.provider_id || user.user_metadata.sub)) || "");
+
+  return { id: user.id, callsign, rank, level, staff, squadLeader, tonight, discordId: /^\d{15,22}$/.test(discordId) ? discordId : null };
+}
+
+// A short tag for a voice channel: "Fireteam 2" -> "FT2", anything else -> its name.
+export function voiceTag(name) {
+  const clean = String(name || "").replace(/[^\p{L}\p{N}\s'&/-]/gu, " ").replace(/\s+/g, " ").trim();
+  const ft = /fire\s*team\s*(\d+)/i.exec(clean) || /\bft\s*(\d+)/i.exec(clean);
+  if (ft) return "FT" + ft[1];
+  return clean.length > 16 ? clean.slice(0, 15) + "…" : clean || "Voice";
 }
 
 export function rights(me) {
@@ -140,15 +157,52 @@ export class Radio {
   }
 
   async alarm() {
-    let waiting = false;
     for (const ws of this.ctx.getWebSockets()) {
       const a = ws.deserializeAttachment() || {};
-      if (a.state === "hello") {
-        if (Date.now() - (a.at || 0) > 15000) { try { ws.close(4001, "Sign in took too long"); } catch {} }
-        else waiting = true;
-      }
+      if (a.state === "hello" && Date.now() - (a.at || 0) > 15000) { try { ws.close(4001, "Sign in took too long"); } catch {} }
     }
-    if (waiting) await this.ctx.storage.setAlarm(Date.now() + 15000);
+    await this.voiceTick();
+    // Keep ticking while anyone is connected (sign-in timeouts + Discord channels).
+    if (this.ctx.getWebSockets().length) await this.ctx.storage.setAlarm(Date.now() + 15000);
+  }
+
+  // ---------- which Discord voice channel each person is in ----------
+  discord(path) {
+    const base = (this.env.DISCORD_API || "https://discord.com/api/v10").replace(/\/+$/, "");
+    return fetch(base + path, { headers: { Authorization: `Bot ${this.env.DISCORD_BOT_TOKEN}`, "User-Agent": "DAD Ops Radio (dadops.gg, 1.0)" } });
+  }
+  async voiceTick() {
+    if (!this.env.DISCORD_BOT_TOKEN || !/^\d+$/.test(String(this.env.DISCORD_RALLY_POINT_ID || ""))) return;
+    const people = this.members().filter(({ a }) => a.me && a.me.discordId);
+    if (!people.length) return;
+    try {
+      if (!this.guildId) {
+        const r = await this.discord(`/channels/${this.env.DISCORD_RALLY_POINT_ID}`);
+        if (!r.ok) return;
+        this.guildId = (await r.json()).guild_id;
+      }
+      if (!this.chanNames || Date.now() - this.chanAt > 10 * 60e3) {
+        const r = await this.discord(`/guilds/${this.guildId}/channels`);
+        if (r.ok) { this.chanNames = new Map((await r.json()).map((c) => [String(c.id), c.name])); this.chanAt = Date.now(); }
+      }
+    } catch { return; }
+    let changed = false;
+    for (let i = 0; i < people.length; i += 5) { // a few at a time to stay friendly with Discord
+      await Promise.all(people.slice(i, i + 5).map(async ({ ws, a }) => {
+        let voice = a.voice || null;
+        try {
+          const r = await this.discord(`/guilds/${this.guildId}/voice-states/${a.me.discordId}`);
+          if (r.status === 404) voice = null;
+          else if (r.ok) {
+            const j = await r.json();
+            const name = j.channel_id ? (this.chanNames && this.chanNames.get(String(j.channel_id))) || "Voice" : null;
+            voice = name ? { name, tag: voiceTag(name) } : null;
+          }
+        } catch {}
+        if (JSON.stringify(voice) !== JSON.stringify(a.voice || null)) { a.voice = voice; ws.serializeAttachment(a); changed = true; }
+      }));
+    }
+    if (changed) this.pushRoster();
   }
 
   members() {
@@ -163,7 +217,7 @@ export class Radio {
   roster() {
     return this.members().map(({ a }) => ({
       id: a.me.id, conn: a.conn, callsign: a.me.callsign, rank: a.me.rank || null, level: a.me.level, staff: a.me.staff,
-      squadLeader: a.me.squadLeader, nets: a.nets, monitor: a.monitor || [], talking: a.talking || null,
+      squadLeader: a.me.squadLeader, voice: a.voice || null, nets: a.nets, monitor: a.monitor || [], talking: a.talking || null,
       published: !!(a.sessionId && a.trackName),
     }));
   }
@@ -198,8 +252,9 @@ export class Radio {
         // Everyone hears All-call. Command and Air are opt-in.
         const nets = can.listen.filter((n) => !NETS[n].joinable);
         ws.serializeAttachment({ state: "on", me, can, conn, nets, talking: null });
-        reply({ t: "welcome", me, can, conn, nets: NETS, roster: this.roster() });
+        reply({ t: "welcome", me: { ...me, discordId: undefined }, can, conn, nets: NETS, roster: this.roster() });
         this.pushRoster();
+        this.ctx.waitUntil(this.voiceTick()); // look up their Discord channel straight away
         return;
       }
       if (a.state !== "on") return;

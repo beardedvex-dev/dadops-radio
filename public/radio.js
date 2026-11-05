@@ -330,7 +330,7 @@ function pushOverlay() {
     on: true, status,
     nets: Object.keys(R.nets).filter((n) => mine.includes(n)).map((n) => {
       const t = R.roster.find((p) => p.talking === n && p.conn !== R.conn);
-      return { key: n, short: R.nets[n].short, name: R.nets[n].name, talker: t ? t.callsign : null, you: R.tx === n, alert: !R.nets[n].joinable };
+      return { key: n, short: R.nets[n].short, name: R.nets[n].name, talker: t ? t.callsign + (t.voice ? ` · ${t.voice.tag}` : "") : null, you: R.tx === n, alert: !R.nets[n].joinable };
     }),
   });
 }
@@ -440,7 +440,10 @@ function render() {
   $("tonight").textContent = me.tonight ? me.tonight.title : "No op on right now";
   const rank = RANKS[me.rank] || (me.level === "private" ? "Private +" : "Recruit");
   const role = [rank, me.staff ? "S3" : null, me.squadLeader ? "Squad Leader tonight" : null].filter(Boolean).join(" · ");
-  $("whoami").textContent = `Signed in as ${me.callsign} (${role})`;
+  const mine0 = R.roster.find((x) => x.conn === R.conn);
+  const myVoice = mine0 && mine0.voice;
+  $("whoami").textContent = `Signed in as ${me.callsign} (${role})` + (myVoice ? ` · Discord: ${myVoice.name}` : "");
+  $("kit-discord").textContent = myVoice ? `Discord: ${myVoice.name}` : "";
   const mine = myNets();
 
   for (const [key, { el, q }] of Object.entries(R.cards)) {
@@ -472,11 +475,11 @@ function render() {
     const sp = q("speaking");
     if (talker && joined) {
       sp.hidden = false;
-      sp.innerHTML = talker.conn === R.conn ? `<b>You</b> are talking` : `<b>${esc(talker.callsign)}</b> is talking`;
+      sp.innerHTML = talker.conn === R.conn ? `<b>You</b> are talking` : `<b>${esc(talker.callsign)}${talker.voice ? ` · ${esc(talker.voice.tag)}` : ""}</b> is talking`;
     } else sp.hidden = true;
 
     q("people").innerHTML = joined ? on.map((p) => { const mon = (p.monitor || []).includes(key);
-      return `<span class="chip ${p.talking === key ? "on" : ""} ${mon ? "mon" : ""}" ${mon ? 'title="Monitoring (listen only)"' : ""}>${esc(p.callsign)}${p.conn === R.conn ? " (you)" : ""}${mon ? " · listening" : ""}</span>`; }).join("") : "";
+      return `<span class="chip ${p.talking === key ? "on" : ""} ${mon ? "mon" : ""}" ${mon ? 'title="Monitoring (listen only)"' : ""}>${esc(p.callsign)}${p.voice ? ` · ${esc(p.voice.tag)}` : ""}${p.conn === R.conn ? " (you)" : ""}${mon ? " · listening" : ""}</span>`; }).join("") : "";
     const mode = q("mode");
     if (mode) { mode.hidden = !(joined && canTalk); mode.querySelectorAll("[data-mode]").forEach((b) => b.setAttribute("aria-pressed", String((b.dataset.mode === "monitor") === monitoring))); }
     q("controls").hidden = !joined;
