@@ -30,7 +30,7 @@
     <p class="muted">Use the same Discord account you use on dadops.gg.</p>
     <div class="box who">
       <div class="label">WHO GETS WHAT</div>
-      <div class="row"><b>Private +</b><span>Command and Air / Recon. Listen to All-call.</span></div>
+      <div class="row"><b>Private +</b><span>Command, Recon, Air Support and Logistics. Listen to All-call.</span></div>
       <div class="row"><b>Recruits</b><span>Listen to All-call. The rest opens when your Battle Buddies vouch you in.</span></div>
       <div class="row"><b>SL + S3</b><span>Can talk on All-call too.</span></div>
     </div>
@@ -57,10 +57,17 @@
     </div>
     <div class="notice">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 8v5M12 16.5v.5"></path></svg>
-      <div>This is the <b>browser test</b>. Talk keys only work while this tab is in front. In a game, use the hold-to-talk buttons on a second screen, or wait for the desktop app.</div>
+      <div id="notice-text">This is the <b>browser version</b>. Talk keys only work while this tab is in front. For keys that work in-game, use the desktop app.</div>
     </div>
     <div class="label pad">YOUR NETS</div>
     <div id="nets" class="nets"></div>
+    <div id="desk" class="box desk" hidden>
+      <div class="label">DESKTOP APP <span class="muted" id="app-version"></span></div>
+      <label class="opt"><input type="checkbox" id="opt-overlay"> Show the overlay in-game</label>
+      <label class="opt"><input type="checkbox" id="opt-startup"> Start with Windows</label>
+      <div id="update" class="update" hidden><span id="update-text"></span><button id="update-now" class="join">Restart now</button></div>
+      <p class="muted">Closing this window keeps the radio running in the tray (bottom right, by the clock). Right-click the DAD Ops patch there to quit.</p>
+    </div>
     <div class="grow"></div>
     <footer class="foot">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#AEA06E" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"></rect><path d="M5 11a7 7 0 0 0 14 0M12 18v3"></path></svg>

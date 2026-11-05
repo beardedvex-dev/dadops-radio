@@ -12,8 +12,9 @@ as normal. The radio adds:
 | **Logistics / Vehicles** | Private and up | Drivers and supply runs. Right ear by default |
 | **All-call** | Everyone listens; S3 and tonight's Squad Leader talk | Both ears, chirp first |
 
-**Status:** phase 1, the **browser test**. The desktop app (talk keys that
-work while the game has focus, plus the overlay) is phase 2.
+**Status:** the browser version is live. The **desktop app** (talk keys that
+work while the game has focus, Mouse 4/5, the overlay, tray, start with
+Windows, auto-update) is in `desktop/`. Build and install steps: [DESKTOP.md](DESKTOP.md).
 
 Plan: `claude/Radio-Plan.md` in the DAD Ops project. Setup: [SETUP.md](SETUP.md).
 Test night: [TEST-NIGHT.md](TEST-NIGHT.md).
@@ -48,6 +49,9 @@ Test night: [TEST-NIGHT.md](TEST-NIGHT.md).
 | `public/index.html`, `radio.js`, `radio.css`, `patch.png` | The test page |
 | `SETUP.md` | One-time setup steps |
 | `TEST-NIGHT.md` | Checklist for the first test with the crew |
+| `desktop/` | The Windows app (Electron): `main.js` window/tray/keys/overlay/updates, `keys.js`, `preload.js`, `overlay.html`/`overlay.js`, `config.json` (the radio address) |
+| `.github/workflows/desktop.yml` | Builds the installer on GitHub (Actions → Build desktop app → Run workflow). A copy to paste in is `desktop/build-workflow.yml` |
+| `DESKTOP.md` | Building, installing and using the desktop app |
 
 **Adding or changing a net:** edit the `NETS` list at the top of
 `src/worker.js` (copy a line, change the key, name, short tag and

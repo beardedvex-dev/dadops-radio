@@ -80,3 +80,8 @@ button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid var(-
 .meter span{width:14px;height:4px;border-radius:2px;background:var(--line)}
 .meter span.on{background:var(--olive-light)}
 .foot.tx .meter span.on{background:var(--black)}
+.desk{margin:12px 20px 0;max-width:none;width:auto}
+.opt{display:flex;align-items:center;gap:10px;font-size:14px}
+.opt input{width:18px;height:18px;accent-color:var(--tan)}
+.update{display:flex;align-items:center;gap:10px;justify-content:space-between;font-size:14px;color:var(--tan)}
+body.desktop .test-tag{display:none}

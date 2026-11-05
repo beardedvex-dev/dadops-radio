@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; script-src 'self'">
+<title>DAD Ops Radio overlay</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@600;700&family=Big+Shoulders+Display:wght@800&family=Black+Ops+One&display=swap">
+<style>
+  html,body{margin:0;background:transparent;overflow:hidden;font-family:Barlow,"Segoe UI",sans-serif;color:#EFE6D2;user-select:none}
+  .wrap{display:flex;flex-direction:column;gap:4px;padding:8px;width:fit-content;min-width:200px}
+  .head{display:flex;align-items:center;gap:6px;padding:0 2px 2px}
+  .head img{width:18px;height:18px}
+  .head span{font-family:"Black Ops One",sans-serif;font-size:11px;letter-spacing:1.5px;text-shadow:0 1px 2px #000}
+  .row{display:flex;align-items:center;gap:8px;padding:5px 10px;background:rgba(14,14,11,.72);border:1px solid rgba(174,160,110,.35);border-radius:6px;font-size:13px}
+  .tag{font-family:"Big Shoulders Display",sans-serif;font-weight:800;font-size:14px;letter-spacing:1px;padding:0 5px;border-radius:3px;color:#AEA06E;border:1px solid #746B42}
+  .quiet{color:#A39B86;font-size:12px}
+  .live{background:rgba(14,14,11,.88);border-color:#F3B77A}
+  .live .tag{background:#F3B77A;border-color:#F3B77A;color:#0E0E0B}
+  .live .who{font-weight:700;color:#F3B77A}
+  .alert{border:2px solid #FF5B4F}
+  .alert .tag{background:#FF5B4F;border-color:#FF5B4F;color:#0E0E0B}
+  .alert .who{color:#EFE6D2}
+  .tx{background:#F3B77A;border-color:#F3B77A;color:#0E0E0B}
+  .tx .tag{background:#0E0E0B;border-color:#0E0E0B;color:#F3B77A}
+  .tx .who{font-family:"Black Ops One",sans-serif;font-size:13px;letter-spacing:1px;color:#0E0E0B}
+  .tx.alert{background:#FF5B4F;border-color:#FF5B4F}
+  .down{border-style:dashed}
+  .bars{display:inline-flex;gap:2px;align-items:center;height:12px}
+  .bars i{display:block;width:3px;background:currentColor;border-radius:1px;animation:b .6s ease-in-out infinite alternate}
+  .bars i:nth-child(1){height:5px}.bars i:nth-child(2){height:10px;animation-delay:.15s}.bars i:nth-child(3){height:12px;animation-delay:.3s}.bars i:nth-child(4){height:7px;animation-delay:.45s}
+  @keyframes b{to{transform:scaleY(.4)}}
+</style>
+</head>
+<body>
+<div class="wrap" id="wrap"></div>
+<script src="overlay.js"></script>
+</body>
+</html>

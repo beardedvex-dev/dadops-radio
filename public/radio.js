@@ -33,6 +33,11 @@ const keyLabel = (k) => {
   return c.replace(/^Numpad/, "NUM ").replace(/(Left|Right)$/, " $1").toUpperCase();
 };
 
+// dadops.gg rank codes -> names (same ladder as the website)
+const RANKS = { recruit: "Recruit", pvt: "Private", pfc: "Private First Class", cpl: "Corporal", sgt: "Sergeant",
+  sfc: "Sergeant First Class", "2lt": "Second Lieutenant", "1lt": "First Lieutenant", cpt: "Captain", maj: "Major",
+  ltc: "Lieutenant Colonel", col: "Colonel" };
+
 // ---------- state ----------
 const R = {
   cfg: null, sb: null, token: null,
@@ -43,6 +48,8 @@ const R = {
   tx: null, capture: null, cards: {}, retry: 0, stopping: false,
 };
 window.__radio = R; // handy when testing from the browser console
+// Set when this page is running inside the DAD Ops Radio desktop app.
+const DESK = window.dadopsDesktop || null;
 
 // ---------- sign in ----------
 async function boot() {
@@ -54,6 +61,7 @@ async function boot() {
   R.token = data.session.access_token;
   $("signout").hidden = false;
   show("v-ready");
+  if (DESK) { desktopSetup(); connect().catch((e) => { $("ready-err").textContent = e.message || String(e); $("goonnet").disabled = false; }); }
 }
 $("signin").onclick = () => R.sb.auth.signInWithOAuth({ provider: "discord", options: { redirectTo: location.origin + "/" } });
 $("signout").onclick = async () => { R.stopping = true; teardown(); await R.sb.auth.signOut(); location.reload(); };
@@ -236,21 +244,73 @@ function netForInput(e) { return Object.keys(settings).find((n) => matches(setti
 const typing = () => /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName) && document.activeElement.type !== "range";
 
 window.addEventListener("keydown", (e) => {
+  if (DESK) { if (R.capture) e.preventDefault(); return; }
   if (R.capture) { e.preventDefault(); if (e.code !== "Escape") setKey(R.capture, { code: e.code }); else endCapture(); return; }
   if (e.repeat || typing()) return;
   const n = netForInput(e);
   if (n && R.can && R.can.talk.includes(n)) { e.preventDefault(); startTalk(n); }
 });
-window.addEventListener("keyup", (e) => { const n = netForInput(e); if (n && R.tx === n) stopTalk(); });
+window.addEventListener("keyup", (e) => { if (DESK) return; const n = netForInput(e); if (n && R.tx === n) stopTalk(); });
 window.addEventListener("mousedown", (e) => {
+  if (DESK) { if (e.button === 3 || e.button === 4) e.preventDefault(); return; }
   if (R.capture && e.button > 0) { e.preventDefault(); return setKey(R.capture, { button: e.button }); }
   if (e.button === 0) return;
   const n = netForInput(e);
   if (n && R.can && R.can.talk.includes(n)) { e.preventDefault(); startTalk(n); }
 });
-window.addEventListener("mouseup", (e) => { if (e.button === 3 || e.button === 4) e.preventDefault(); const n = netForInput(e); if (n && R.tx === n) stopTalk(); });
+window.addEventListener("mouseup", (e) => { if (e.button === 3 || e.button === 4) e.preventDefault(); if (DESK) return; const n = netForInput(e); if (n && R.tx === n) stopTalk(); });
 window.addEventListener("contextmenu", (e) => { if (R.capture) e.preventDefault(); });
-window.addEventListener("blur", () => stopTalk());
+window.addEventListener("blur", () => { if (!DESK) stopTalk(); }); // in the app the game has focus while you talk
+
+// ---------- desktop app ----------
+// Keys and mouse buttons from anywhere in Windows, game included.
+function onDesktopInput(ev) {
+  if (!ev || (ev.type !== "down" && ev.type !== "up")) return;
+  if (R.capture) {
+    if (ev.type !== "down") return;
+    if (ev.code === "Escape") return endCapture();
+    if (ev.code) return setKey(R.capture, { code: ev.code });
+    if (ev.button != null && ev.button !== 0 && ev.button !== 2) return setKey(R.capture, { button: ev.button });
+    return;
+  }
+  const n = netForInput(ev);
+  if (!n || !R.can) return;
+  if (ev.type === "down") { if (R.can.talk.includes(n)) startTalk(n); }
+  else if (R.tx === n) stopTalk();
+}
+let deskPrefs = {};
+function desktopSetup() {
+  document.body.classList.add("desktop");
+  $("notice-text").innerHTML = "<b>Desktop app.</b> Your talk keys work while the game is in front. Click a key box on a net to change it (Mouse 4/5 work too).";
+  DESK.onInput(onDesktopInput);
+  const apply = (p) => {
+    if (!p) return;
+    deskPrefs = p;
+    $("opt-overlay").checked = !!p.overlay;
+    $("opt-startup").checked = !!p.startWithWindows;
+    $("app-version").textContent = p.version ? `v${p.version}` : "";
+    $("update").hidden = !p.update;
+    if (p.update) $("update-text").textContent = `Update ready (v${p.update}).`;
+  };
+  DESK.getPrefs().then(apply).catch(() => {});
+  DESK.onPrefs(apply);
+  $("opt-overlay").onchange = (e) => DESK.setPrefs({ overlay: e.target.checked }).then(apply);
+  $("opt-startup").onchange = (e) => DESK.setPrefs({ startWithWindows: e.target.checked }).then(apply);
+  $("update-now").onclick = () => DESK.installUpdate();
+  $("desk").hidden = false;
+}
+function pushOverlay() {
+  if (!DESK || !R.me) return;
+  const mine = myNets();
+  const status = $("status-text").textContent;
+  DESK.overlay({
+    on: true, status,
+    nets: Object.keys(R.nets).filter((n) => mine.includes(n)).map((n) => {
+      const t = R.roster.find((p) => p.talking === n && p.conn !== R.conn);
+      return { key: n, short: R.nets[n].short, name: R.nets[n].name, talker: t ? t.callsign : null, you: R.tx === n, alert: !R.nets[n].joinable };
+    }),
+  });
+}
 
 function setKey(net, key) {
   for (const n of Object.keys(settings)) if (n !== net && JSON.stringify(settings[n].key) === JSON.stringify(key)) settings[n].key = null;
@@ -286,7 +346,7 @@ function meter(stream) {
 }
 
 // ---------- screen ----------
-function setStatus(text, cls) { $("status-text").textContent = text; $("status").className = "pill " + (cls || ""); }
+function setStatus(text, cls) { $("status-text").textContent = text; $("status").className = "pill " + (cls || ""); pushOverlay(); }
 
 function buildNets() {
   const box = $("nets");
@@ -340,7 +400,8 @@ function render() {
   if (!R.me) return;
   const me = R.me;
   $("tonight").textContent = me.tonight ? me.tonight.title : "No op on right now";
-  const role = [me.level === "private" ? "Private +" : "Recruit", me.staff ? "S3" : null, me.squadLeader ? "Squad Leader tonight" : null].filter(Boolean).join(" · ");
+  const rank = RANKS[me.rank] || (me.level === "private" ? "Private +" : "Recruit");
+  const role = [rank, me.staff ? "S3" : null, me.squadLeader ? "Squad Leader tonight" : null].filter(Boolean).join(" · ");
   $("whoami").textContent = `Signed in as ${me.callsign} (${role})`;
   const mine = myNets();
 
@@ -389,6 +450,7 @@ function render() {
   $("foot-text").textContent = !R.micTrack ? "Listen only" : R.tx ? `Talking on ${R.nets[R.tx].name}` :
     first ? `Hold ${keyLabel(S(first).key)} to talk on ${R.nets[first].name}` : "Join a net to talk";
   mix();
+  pushOverlay();
 }
 
 boot().catch((e) => { show("v-ready"); $("ready-err").textContent = "Couldn't load the radio: " + (e.message || e); });

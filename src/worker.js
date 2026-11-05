@@ -78,12 +78,12 @@ export async function whoIs(env, token, now = Date.now()) {
   else if (m && m.why === "away") return { error: "Rejoin the DAD Ops Discord to use the radio." };
   else return { error: "Sign in again." };
 
-  // Callsign and S3 badge (profiles are public on dadops.gg).
-  let callsign = "Operator", staff = false;
-  const pres = await fetch(`${base}/rest/v1/profiles?id=eq.${encodeURIComponent(user.id)}&select=callsign,staff`, { headers: h });
+  // Callsign, rank and S3 badge (profiles are public on dadops.gg).
+  let callsign = "Operator", staff = false, rank = null;
+  const pres = await fetch(`${base}/rest/v1/profiles?id=eq.${encodeURIComponent(user.id)}&select=callsign,staff,service_rank`, { headers: h });
   if (pres.ok) {
     const rows = await pres.json();
-    if (rows && rows[0]) { callsign = rows[0].callsign || callsign; staff = rows[0].staff != null; }
+    if (rows && rows[0]) { callsign = rows[0].callsign || callsign; staff = rows[0].staff != null; rank = rows[0].service_rank || null; }
   } else {
     const p2 = await fetch(`${base}/rest/v1/profiles?id=eq.${encodeURIComponent(user.id)}&select=callsign`, { headers: h });
     if (p2.ok) { const r = await p2.json(); if (r && r[0] && r[0].callsign) callsign = r[0].callsign; }
@@ -104,7 +104,7 @@ export async function whoIs(env, token, now = Date.now()) {
     }
   }
 
-  return { id: user.id, callsign, level, staff, squadLeader, tonight };
+  return { id: user.id, callsign, rank, level, staff, squadLeader, tonight };
 }
 
 export function rights(me) {
@@ -162,7 +162,7 @@ export class Radio {
 
   roster() {
     return this.members().map(({ a }) => ({
-      id: a.me.id, conn: a.conn, callsign: a.me.callsign, level: a.me.level, staff: a.me.staff,
+      id: a.me.id, conn: a.conn, callsign: a.me.callsign, rank: a.me.rank || null, level: a.me.level, staff: a.me.staff,
       squadLeader: a.me.squadLeader, nets: a.nets, talking: a.talking || null,
       published: !!(a.sessionId && a.trackName),
     }));
