@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DAD Ops Radio</title>
+<meta name="description" content="DAD Ops Radio: talk to the other fireteam leads without leaving your squad's Discord channel. Extra nets, in-game talk keys, an overlay and the Field PDA in one field kit.">
+<link rel="icon" type="image/png" href="/img/patch.png">
+<meta property="og:title" content="DAD Ops Radio">
+<meta property="og:description" content="Talk to the other fireteam leads without leaving your squad's channel.">
+<meta property="og:image" content="https://radio.dadops.gg/img/kit-open.png">
+<meta name="theme-color" content="#0e0e0b">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Big+Shoulders+Display:wght@600;800&family=Black+Ops+One&family=IBM+Plex+Mono:wght@500;600&family=Yellowtail&display=swap">
+<style>
+  :root{--tan:#F3B77A;--tan-dark:#C98B4E;--olive:#746B42;--olive-light:#AEA06E;--cream:#EFE6D2;--black:#0E0E0B;--red:#FF5B4F;
+    --panel:#15150f;--panel2:#191912;--line:#3a3528;--soft:#CFC6B0;--muted:#A39B86}
+  *{box-sizing:border-box}
+  html,body{margin:0;background:#0f0f0b;color:var(--cream);font-family:Barlow,system-ui,sans-serif;line-height:1.5}
+  a{color:var(--tan)} a:hover{color:#FFD3A6}
+  a:focus-visible,button:focus-visible{outline:2px solid var(--tan);outline-offset:3px}
+  .wrap{max-width:1180px;margin:0 auto;padding:0 20px}
+  .lbl{font:600 11px/1.2 "IBM Plex Mono",monospace;letter-spacing:.14em;text-transform:uppercase;color:var(--olive-light)}
+  header.top{border-bottom:1px solid var(--line);background:#0b0b09}
+  header.top .wrap{display:flex;align-items:center;gap:12px;height:60px}
+  header.top img{width:34px;height:34px}
+  header.top .brand{font:18px "Black Ops One",sans-serif;color:var(--tan);letter-spacing:1px;text-decoration:none}
+  header.top nav{margin-left:auto;display:flex;gap:18px;flex-wrap:wrap}
+  header.top nav a{font:600 12px "IBM Plex Mono",monospace;letter-spacing:.1em;text-transform:uppercase;color:var(--soft);text-decoration:none}
+  header.top nav a:hover{color:var(--tan)}
+  .hero{padding:56px 0 30px;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.25fr);gap:40px;align-items:center}
+  .hero h1{font:400 clamp(40px,6vw,64px)/1 "Black Ops One",sans-serif;color:var(--tan);margin:10px 0 0;letter-spacing:1px}
+  .script{font:30px/1 Yellowtail,cursive;color:var(--cream);margin:10px 0 0}
+  .hero p.lead{font-size:19px;color:var(--soft);margin:18px 0 0;max-width:520px}
+  .ctas{display:flex;gap:12px;flex-wrap:wrap;margin-top:26px}
+  .btn{display:inline-flex;align-items:center;gap:10px;min-height:52px;padding:0 22px;border-radius:8px;font:700 16px Barlow,sans-serif;text-decoration:none;border:1px solid var(--tan)}
+  .btn.primary{background:var(--tan);color:var(--black)} .btn.primary:hover{background:#FFC995;color:var(--black)}
+  .btn.ghost{background:transparent;color:var(--tan)} .btn.ghost:hover{background:#262115}
+  .btn small{font:500 12px "IBM Plex Mono",monospace;opacity:.8}
+  .fine{font-size:13px;color:var(--muted);margin-top:10px}
+  .shot{width:100%;height:auto;display:block;border-radius:18px;box-shadow:0 30px 70px rgba(0,0,0,.6)}
+  section{padding:46px 0;border-top:1px solid #23211a}
+  h2{font:400 30px "Black Ops One",sans-serif;color:var(--tan);margin:6px 0 20px;letter-spacing:.5px}
+  h3{font:800 19px "Big Shoulders Display",sans-serif;letter-spacing:.12em;text-transform:uppercase;margin:0 0 6px;color:var(--cream)}
+  .grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:18px}
+  .card p{margin:0;color:var(--soft)}
+  .step{display:flex;gap:14px}
+  .num{flex:none;width:36px;height:36px;border-radius:50%;border:3px solid var(--olive);display:flex;align-items:center;justify-content:center;font:16px "Black Ops One",sans-serif;color:var(--tan)}
+  table{width:100%;border-collapse:collapse;font-size:15px}
+  th,td{text-align:left;padding:12px 14px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{font:600 11px "IBM Plex Mono",monospace;letter-spacing:.12em;text-transform:uppercase;color:var(--olive-light)}
+  td b{font:800 16px "Big Shoulders Display",sans-serif;letter-spacing:.12em;text-transform:uppercase}
+  .bar{display:inline-block;width:4px;height:16px;border-radius:2px;background:var(--olive);margin-right:8px;vertical-align:-2px}
+  .bar.red{background:var(--red)}
+  .tablebox{background:var(--panel);border:1px solid var(--line);border-radius:10px;overflow-x:auto}
+  .two{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:30px;align-items:start}
+  ul.tight{margin:0;padding-left:20px;color:var(--soft)} ul.tight li{margin:6px 0}
+  kbd{font:600 12px "IBM Plex Mono",monospace;padding:2px 7px;border:1px solid #4a4434;border-bottom-width:2px;border-radius:5px;background:var(--black);color:var(--cream)}
+  details{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px 18px;margin-bottom:10px}
+  summary{cursor:pointer;font-weight:700}
+  details p,details ul{color:var(--soft);margin:10px 0 0}
+  footer{border-top:1px solid var(--line);padding:28px 0 40px;color:var(--muted);font-size:14px}
+  footer .wrap{display:flex;gap:16px;flex-wrap:wrap;align-items:center;justify-content:space-between}
+  @media (max-width:900px){.hero,.two{grid-template-columns:minmax(0,1fr)}.grid3{grid-template-columns:minmax(0,1fr)}header.top nav{display:none}}
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <img src="/img/patch.png" alt="" width="34" height="34">
+    <a class="brand" href="/">DAD OPS RADIO</a>
+    <nav aria-label="Page"><a href="#how">How it works</a><a href="#nets">Nets</a><a href="#setup">Setup</a><a href="#faq">Questions</a><a href="https://dadops.gg">dadops.gg</a></nav>
+  </div>
+</header>
+
+<main>
+  <div class="wrap hero">
+    <div>
+      <div class="lbl">DAD Ops · comms</div>
+      <h1>DAD OPS RADIO</h1>
+      <p class="script">Limited Availability</p>
+      <p class="lead">Talk to the other fireteam leads without leaving your squad's Discord channel. Hold a key, reach every lead on Command, and keep playing.</p>
+      <div class="ctas">
+        <a class="btn primary" id="dl" href="https://github.com/beardedvex-dev/DadOps-Radio/releases/latest">Download for Windows <small id="dl-ver"></small></a>
+        <a class="btn ghost" href="https://dadops-radio.beardedvex.workers.dev">Open in your browser</a>
+      </div>
+      <p class="fine">Free. Windows 10/11. Sign in with the same Discord you use on dadops.gg. The browser version works on Mac and phones too (keys only while its tab is in front).</p>
+    </div>
+    <img class="shot" src="/img/kit-open.png" alt="The DAD Ops field kit: the radio on the left with Command, Recon, Logistics and All-call, and the Field PDA folded out on the right" width="1640" height="840">
+  </div>
+
+  <section id="how">
+    <div class="wrap">
+      <div class="lbl">How it works</div>
+      <h2>Discord for your squad. The radio for everyone else.</h2>
+      <div class="grid3">
+        <div class="card"><h3>Stay in your channel</h3><p>Your fireteam keeps talking in its Discord channel with your normal Discord push-to-talk. Nothing about that changes.</p></div>
+        <div class="card"><h3>Key up on a net</h3><p>Hold your Command key (say <kbd>Mouse 5</kbd>) and every lead on Command hears you, in one ear, at the volume they set. Your squad doesn't hear the chatter.</p></div>
+        <div class="card"><h3>See who's talking</h3><p>A small overlay in the corner shows who's on which net, with their fireteam from Discord: <em>Pickles · FT1</em>. Press <kbd>F9</kbd> for the whole field kit.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="nets">
+    <div class="wrap">
+      <div class="lbl">The nets</div>
+      <h2>Five nets, one key each</h2>
+      <div class="tablebox">
+        <table>
+          <thead><tr><th scope="col">Net</th><th scope="col">For</th><th scope="col">Who</th><th scope="col">Ear</th></tr></thead>
+          <tbody>
+            <tr><td><span class="bar"></span><b>Command</b></td><td>Fireteam leads talking to each other</td><td>Private and up</td><td>Left</td></tr>
+            <tr><td><span class="bar"></span><b>Recon</b></td><td>Scouts and snipers calling out what they see</td><td>Private and up</td><td>Right</td></tr>
+            <tr><td><span class="bar"></span><b>Air Support</b></td><td>Heli pilots and air support calls</td><td>Private and up</td><td>Right</td></tr>
+            <tr><td><span class="bar"></span><b>Logistics / Vehicles</b></td><td>Drivers, supply runs and vehicle moves</td><td>Private and up</td><td>Right</td></tr>
+            <tr><td><span class="bar red"></span><b>All-call</b></td><td>"Regroup at the vehicle." Plays a chirp first</td><td>Everyone listens; tonight's Squad Leader and S3 talk</td><td>Both</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="fine">Want to hear a net without talking on it? Pick <b>Monitor only</b>: you hear it, your key for it does nothing, and others see you as <em>listening</em>. Recruits can listen to All-call; the rest opens once your Battle Buddies vouch you in to Private. Ears and volume are yours to change.</p>
+    </div>
+  </section>
+
+  <section id="setup">
+    <div class="wrap two">
+      <div>
+        <div class="lbl">Setup · about 5 minutes</div>
+        <h2>Get on net</h2>
+        <div style="display:flex;flex-direction:column;gap:16px">
+          <div class="step"><span class="num">1</span><div><h3>Install</h3><p style="margin:0;color:var(--soft)">Download, run it. Windows may say <em>"Windows protected your PC"</em> because the app is new: click <b>More info</b> → <b>Run anyway</b>.</p></div></div>
+          <div class="step"><span class="num">2</span><div><h3>Sign in</h3><p style="margin:0;color:var(--soft)">Sign in with Discord (the same account as dadops.gg). It gets on net by itself; allow the microphone if Windows asks.</p></div></div>
+          <div class="step"><span class="num">3</span><div><h3>Join and set your keys</h3><p style="margin:0;color:var(--soft)">Click <b>Join net</b> on Command, then click its key box and press the button you want. Use a mouse button or a key you never type with: talk keys work everywhere, even while you type.</p></div></div>
+          <div class="step"><span class="num">4</span><div><h3>Game in Borderless</h3><p style="margin:0;color:var(--soft)">Set WARDOGS to <b>Borderless</b> or <b>Windowed</b> so the overlay and the field kit can show on top. Nothing can draw over exclusive Fullscreen.</p></div></div>
+        </div>
+      </div>
+      <div>
+        <img class="shot" src="/img/kit-folded.png" alt="The radio folded: header cells, tonight's op, and the nets with Command talking" width="520" height="840" style="max-width:420px;margin:0 auto">
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap">
+      <div class="lbl">The field kit</div>
+      <h2>Radio and Field PDA, one device</h2>
+      <div class="grid3">
+        <div class="card"><h3>F9 anywhere</h3><p>Pops the whole kit up over the game with the Field PDA folded out. Press it again to tuck it away. The radio stays on net the whole time.</p></div>
+        <div class="card"><h3>Fold it</h3><p>Just want the radio? <b>◂ FOLD</b> on the hinge. Want the PDA back? The <b>FIELD PDA ▸</b> tab on the edge.</p></div>
+        <div class="card"><h3>Lives in the tray</h3><p><b>×</b> hides it by the clock and keeps you on net. It can start with Windows, and it updates itself.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="faq">
+    <div class="wrap">
+      <div class="lbl">Questions</div>
+      <h2>Good to know</h2>
+      <details><summary>Does it touch the game? Anti-cheat?</summary><p>No. The overlay is its own see-through window on top, like Discord's, and the talk keys use the same standard Windows key listener Discord and OBS use. Nothing reads or changes the game.</p></details>
+      <details><summary>My talk key types into chat / keys me up while typing</summary><p>Talk keys work everywhere, so pick something you never type with: <kbd>Mouse 5</kbd>, <kbd>Mouse 4</kbd>, a numpad key or <kbd>F13</kbd>. New installs start on Mouse 5 (Command) and Mouse 4 (All-call).</p></details>
+      <details><summary>Talk keys don't work in the game</summary><ul><li>If the game (or its launcher) runs as administrator, Windows won't pass its keys to a normal app. Try running the radio as administrator once to check.</li><li>The <b>Desktop app</b> drawer at the bottom of the radio says whether in-game keys are working.</li></ul></details>
+      <details><summary>The overlay or the kit doesn't show over the game</summary><p>Switch the game to Borderless or Windowed. Also check <b>Show the overlay in-game</b> is ticked in the Desktop app drawer.</p></details>
+      <details><summary>"Windows protected your PC" or an antivirus warning</summary><p>The app isn't code-signed yet, and new apps that listen for keys sometimes get flagged. Click <b>More info</b> → <b>Run anyway</b>. The code is public on GitHub.</p></details>
+      <details><summary>Mac, Linux or phone?</summary><p>The desktop app is Windows only. The <a href="https://dadops-radio.beardedvex.workers.dev">browser version</a> works anywhere, with keys while its tab is in front and hold-to-talk buttons.</p></details>
+      <details><summary>Who can use it?</summary><p>DAD Ops members signed in on dadops.gg. Recruits can listen to All-call; everything else opens at Private.</p></details>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <span>DAD Ops Radio · <span style="font-family:Yellowtail,cursive;font-size:20px;color:var(--tan)">Limited Availability</span></span>
+    <span>Tactical when it counts. Cold ones the rest of the time. · <a href="https://dadops.gg">dadops.gg</a></span>
+  </div>
+</footer>
+
+<script>
+// Point the download button straight at the newest installer.
+fetch("https://api.github.com/repos/beardedvex-dev/DadOps-Radio/releases/latest")
+  .then((r) => (r.ok ? r.json() : null))
+  .then((rel) => {
+    if (!rel) return;
+    const exe = (rel.assets || []).find((a) => /\.exe$/i.test(a.name));
+    if (exe) document.getElementById("dl").href = exe.browser_download_url;
+    if (rel.tag_name) document.getElementById("dl-ver").textContent = rel.tag_name;
+  })
+  .catch(() => {});
+</script>
+</body>
+</html>

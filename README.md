@@ -52,6 +52,7 @@ Test night: [TEST-NIGHT.md](TEST-NIGHT.md).
 | `desktop/` | The Windows app (Electron): `main.js` window/tray/keys/overlay/updates, `keys.js`, `preload.js`, `overlay.html`/`overlay.js`, `config.json` (the radio address) |
 | `.github/workflows/desktop.yml` | Builds the installer on GitHub (Actions → Build desktop app → Run workflow). A copy to paste in is `desktop/build-workflow.yml` |
 | `DESKTOP.md` | Building, installing and using the desktop app |
+| `site/` | radio.dadops.gg, the radio's home page (own Vercel project). Steps: `HOME-PAGE.md` |
 
 **Adding or changing a net:** edit the `NETS` list at the top of
 `src/worker.js` (copy a line, change the key, name, short tag and
@@ -59,4 +60,5 @@ description), then commit and push. A Nets screen for S3 is planned for
 phase 2.
 
 Secrets (in Cloudflare only, never in this repo): `REALTIME_APP_ID`,
-`REALTIME_APP_SECRET`.
+`REALTIME_APP_SECRET`, and optionally `DISCORD_BOT_TOKEN` + `DISCORD_RALLY_POINT_ID`
+(shows each person's Discord voice channel; see SETUP.md).
