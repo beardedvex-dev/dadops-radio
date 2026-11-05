@@ -22,9 +22,24 @@
     "appId": "gg.dadops.radio",
     "productName": "DAD Ops Radio",
     "artifactName": "DAD-Ops-Radio-Setup-${version}.${ext}",
-    "files": ["main.js", "keys.js", "preload.js", "overlay-preload.js", "overlay.html", "overlay.js", "config.json", "build/icon.png"],
-    "directories": { "buildResources": "build", "output": "dist" },
-    "win": { "target": "nsis", "icon": "build/icon.png" },
+    "files": [
+      "main.js",
+      "keys.js",
+      "preload.js",
+      "overlay-preload.js",
+      "overlay.html",
+      "overlay.js",
+      "config.json",
+      "build/icon.png"
+    ],
+    "directories": {
+      "buildResources": "build",
+      "output": "dist"
+    },
+    "win": {
+      "target": "nsis",
+      "icon": "build/icon.png"
+    },
     "nsis": {
       "oneClick": true,
       "perMachine": false,
@@ -33,6 +48,14 @@
       "shortcutName": "DAD Ops Radio",
       "runAfterFinish": true
     },
-    "publish": [{ "provider": "github", "owner": "beardedvex-dev", "repo": "DadOps-Radio", "releaseType": "release" }]
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "beardedvex-dev",
+        "repo": "DadOps-Radio",
+        "releaseType": "release"
+      }
+    ],
+    "npmRebuild": false
   }
 }
