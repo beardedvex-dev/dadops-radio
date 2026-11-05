@@ -1,0 +1,30 @@
+// Cloudflare settings for DAD Ops Radio.
+// Cloudflare reads this file every time you push to GitHub.
+{
+  "name": "dadops-radio",
+  "main": "src/worker.js",
+  "compatibility_date": "2025-09-01",
+
+  // The test page (everything in /public). /api/... goes to the Worker first.
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS",
+    "run_worker_first": ["/api/*"]
+  },
+
+  // The switchboard that tracks nets and who's talking.
+  "durable_objects": {
+    "bindings": [{ "name": "RADIO", "class_name": "Radio" }]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Radio"] }],
+
+  // Public settings: the same dadops.gg values the website uses.
+  // REALTIME_APP_ID and REALTIME_APP_SECRET are NOT here: they go in
+  // Cloudflare > Workers > dadops-radio > Settings > Variables and Secrets.
+  "vars": {
+    "SUPABASE_URL": "https://vqyunmnpqujkqrajvhau.supabase.co",
+    "SUPABASE_KEY": "sb_publishable_A7CX1xAK1li3dZb6mVHiBQ__RD_mdEI"
+  },
+
+  "observability": { "enabled": true }
+}

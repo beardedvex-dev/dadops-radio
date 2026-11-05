@@ -1,0 +1,82 @@
+:root{
+  --tan:#F3B77A; --tan-dark:#C98B4E; --olive:#746B42; --olive-light:#AEA06E;
+  --cream:#EFE6D2; --black:#0E0E0B; --red:#FF5B4F;
+  --panel:#15140F; --panel2:#1B1912; --line:#2E2C22; --line2:#3A372B; --muted:#A39B86; --soft:#CFC6B0;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--black);color:var(--cream);font-family:Barlow,system-ui,sans-serif}
+body{min-height:100vh;display:flex;justify-content:center}
+[hidden]{display:none !important}
+button{font:inherit;cursor:pointer}
+button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid var(--tan);outline-offset:2px}
+.app{width:100%;max-width:520px;min-height:100vh;display:flex;flex-direction:column;border-inline:1px solid var(--line)}
+.bar{height:48px;display:flex;align-items:center;gap:10px;padding:0 12px;background:var(--panel);border-bottom:1px solid var(--line)}
+.brand{font-family:"Black Ops One",sans-serif;font-size:15px;letter-spacing:1px;color:var(--tan)}
+.test-tag{font-size:11px;font-weight:700;letter-spacing:1px;padding:2px 7px;border-radius:4px;background:#24221A;color:var(--olive-light)}
+.grow{flex:1 1 auto}
+.brand,.small,.test-tag{white-space:nowrap}
+@media (max-width:420px){.test-tag{display:none}}
+.view{display:flex;flex-direction:column;flex:1 1 auto}
+.center{align-items:center;text-align:center;padding:40px 28px 24px;gap:12px}
+.big-patch{display:block}
+.title{font-family:"Black Ops One",sans-serif;font-weight:400;font-size:32px;letter-spacing:2px;color:var(--tan);margin:6px 0 0}
+.script{font-family:Yellowtail,cursive;font-size:26px;margin:-6px 0 0}
+.lead{font-size:15px;line-height:1.45;color:var(--soft);max-width:340px;margin:4px 0}
+.muted{font-size:13px;color:var(--muted);margin:0}
+.label{font-family:"Big Shoulders Display",sans-serif;font-weight:600;font-size:13px;letter-spacing:2px;color:var(--olive-light)}
+.label.pad{padding:16px 20px 8px}
+.primary{border:0;border-radius:8px;background:var(--tan);color:var(--black);font-weight:700;font-size:16px;min-height:50px;padding:0 20px}
+.primary:hover{background:#FFC995}
+.primary.wide{width:100%;max-width:380px;margin-top:10px}
+.link{display:flex;align-items:center;justify-content:center;text-decoration:none}
+.ghost{background:transparent;border:1px solid var(--line2);border-radius:6px;color:var(--cream);font-weight:600}
+.small{font-size:13px;min-height:32px;padding:0 10px}
+.box{width:100%;max-width:400px;text-align:left;padding:14px;background:var(--panel);border:1px solid var(--line);border-radius:10px;display:flex;flex-direction:column;gap:8px;margin-top:auto}
+.box .row{display:flex;gap:10px;font-size:13px;line-height:1.4}
+.box .row b{width:74px;flex-shrink:0}
+.box .row span{color:var(--soft)}
+.head{display:flex;gap:12px;align-items:flex-start;padding:16px 20px 12px}
+.tonight{font-family:"Big Shoulders Display",sans-serif;font-weight:800;font-size:24px}
+.pill{display:flex;align-items:center;gap:6px;padding:5px 10px;border:1px solid var(--olive);border-radius:999px;font-size:12px;font-weight:600;white-space:nowrap}
+.pill .dot{width:8px;height:8px;border-radius:50%;background:var(--olive)}
+.pill.on .dot{background:var(--tan)}
+.pill.bad{border-color:var(--red)} .pill.bad .dot{background:var(--red)}
+.notice{margin:0 20px;padding:10px 12px;background:#17160F;border:1px solid var(--line);border-radius:8px;display:flex;gap:10px;align-items:flex-start;font-size:13px;line-height:1.4;color:var(--soft)}
+.notice svg{flex-shrink:0;color:var(--olive-light);margin-top:1px}
+.notice b{color:var(--cream)}
+.nets{padding:0 20px;display:flex;flex-direction:column;gap:10px}
+.net{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px;display:flex;flex-direction:column;gap:10px}
+.net.joined{background:var(--panel2);border-color:var(--olive)}
+.net.live{border-color:var(--tan)}
+.net.allcall.live{border-color:var(--red)}
+.net-top{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.net-name{font-family:"Black Ops One",sans-serif;font-size:18px;letter-spacing:1px}
+.net:not(.joined) .net-name{color:var(--soft)}
+.tag{font-size:11px;font-weight:700;letter-spacing:1px;padding:2px 7px;border-radius:4px;background:#24221A;color:var(--olive-light)}
+.count{font-size:12px;color:var(--muted)}
+.key{font-family:"IBM Plex Mono",monospace;font-size:12px;padding:4px 8px;border:1px solid var(--olive);border-radius:5px;background:var(--black);color:var(--cream)}
+.key.wait{border-style:dashed;border-color:var(--tan);color:var(--tan)}
+.desc{font-size:13px;color:var(--muted);margin:0}
+.speaking{display:flex;align-items:center;gap:10px;padding:8px 10px;background:#2A2215;border-radius:6px;font-size:14px}
+.speaking b{color:var(--tan)}
+.net.allcall .speaking{background:#2E1715}
+.net.allcall .speaking b{color:#FF8A80}
+.people{display:flex;flex-wrap:wrap;gap:6px}
+.chip{font-size:12px;padding:3px 8px;border-radius:999px;background:#24221A}
+.chip.on{background:#2A2215;color:var(--tan);font-weight:600}
+.controls{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.seg{display:flex;border:1px solid var(--line2);border-radius:6px;overflow:hidden}
+.seg button{padding:6px 10px;font-size:12px;font-weight:600;border:0;background:transparent;color:var(--soft);white-space:nowrap}
+.seg button[aria-pressed="true"]{background:var(--tan);color:var(--black);font-weight:700}
+.vol{display:flex;align-items:center;gap:6px;flex:1 1 120px;font-size:12px;color:var(--muted)}
+.vol input{flex:1 1 auto;accent-color:var(--tan)}
+.join{border:1px solid var(--tan);color:var(--tan);background:transparent;border-radius:6px;font-weight:700;font-size:13px;min-height:36px;padding:0 14px}
+.ptt{width:100%;min-height:52px;border:1px solid var(--olive);border-radius:8px;background:var(--black);color:var(--cream);font-weight:700;font-size:15px;touch-action:none;user-select:none;-webkit-user-select:none}
+.ptt.tx{background:var(--tan);border-color:var(--tan);color:var(--black)}
+.net.allcall .ptt.tx{background:var(--red);border-color:var(--red)}
+.foot{position:sticky;bottom:0;margin-top:16px;background:var(--panel);border-top:1px solid var(--line);padding:12px 16px;display:flex;align-items:center;gap:12px;font-size:13px;color:var(--soft)}
+.foot.tx{color:var(--black);background:var(--tan)}
+.meter{display:flex;gap:3px;margin-top:4px}
+.meter span{width:14px;height:4px;border-radius:2px;background:var(--line)}
+.meter span.on{background:var(--olive-light)}
+.foot.tx .meter span.on{background:var(--black)}

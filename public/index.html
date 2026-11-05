@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DAD Ops Radio · Test</title>
+<meta name="robots" content="noindex">
+<link rel="icon" type="image/png" href="/patch.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Big+Shoulders+Display:wght@600;800&family=Black+Ops+One&family=IBM+Plex+Mono:wght@500&family=Yellowtail&display=swap">
+<link rel="stylesheet" href="/radio.css">
+</head>
+<body>
+<div class="app">
+  <header class="bar">
+    <img src="/patch.png" alt="" width="28" height="28">
+    <span class="brand">DAD OPS RADIO</span>
+    <span class="test-tag">BROWSER TEST</span>
+    <span class="grow"></span>
+    <button id="signout" class="ghost small" hidden>Sign out</button>
+  </header>
+
+  <!-- 1. Signed out -->
+  <section id="v-signin" class="view center" hidden>
+    <img src="/patch.png" alt="DAD Ops patch: Limited Availability" class="big-patch" width="168" height="168">
+    <h1 class="title">DAD OPS RADIO</h1>
+    <p class="script">Limited Availability</p>
+    <p class="lead">Talk to the other fireteam leads without leaving your squad's channel.</p>
+    <button id="signin" class="primary wide">Sign in with Discord</button>
+    <p class="muted">Use the same Discord account you use on dadops.gg.</p>
+    <div class="box who">
+      <div class="label">WHO GETS WHAT</div>
+      <div class="row"><b>Private +</b><span>Command and Air / Recon. Listen to All-call.</span></div>
+      <div class="row"><b>Recruits</b><span>Listen to All-call. The rest opens when your Battle Buddies vouch you in.</span></div>
+      <div class="row"><b>SL + S3</b><span>Can talk on All-call too.</span></div>
+    </div>
+  </section>
+
+  <!-- 2. Signed in, not on net yet (a click is needed before a browser allows sound and the mic) -->
+  <section id="v-ready" class="view center" hidden>
+    <img src="/patch.png" alt="" class="big-patch" width="120" height="120">
+    <h1 class="title" id="ready-name">READY</h1>
+    <p class="lead" id="ready-note">Your browser will ask to use your microphone.</p>
+    <button id="goonnet" class="primary wide">Get on net</button>
+    <p class="muted" id="ready-err" role="alert"></p>
+  </section>
+
+  <!-- 3. On net -->
+  <section id="v-net" class="view" hidden>
+    <div class="head">
+      <div class="grow">
+        <div class="label">TONIGHT</div>
+        <div class="tonight" id="tonight">No op on right now</div>
+        <div class="muted" id="whoami"></div>
+      </div>
+      <div class="pill" id="status"><span class="dot"></span><span id="status-text">Connecting</span></div>
+    </div>
+    <div class="notice">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 8v5M12 16.5v.5"></path></svg>
+      <div>This is the <b>browser test</b>. Talk keys only work while this tab is in front. In a game, use the hold-to-talk buttons on a second screen, or wait for the desktop app.</div>
+    </div>
+    <div class="label pad">YOUR NETS</div>
+    <div id="nets" class="nets"></div>
+    <div class="grow"></div>
+    <footer class="foot">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#AEA06E" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"></rect><path d="M5 11a7 7 0 0 0 14 0M12 18v3"></path></svg>
+      <div class="grow">
+        <div id="foot-text">Listening</div>
+        <div class="meter" id="meter" aria-hidden="true"></div>
+      </div>
+    </footer>
+  </section>
+
+  <section id="v-denied" class="view center" hidden>
+    <img src="/patch.png" alt="" class="big-patch" width="120" height="120">
+    <h1 class="title">NOT ON THE LIST</h1>
+    <p class="lead" id="denied-why"></p>
+    <a class="primary wide link" href="https://dadops.gg">Go to dadops.gg</a>
+  </section>
+</div>
+<script type="module" src="/radio.js"></script>
+</body>
+</html>
