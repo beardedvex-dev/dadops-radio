@@ -17,10 +17,21 @@
 //    SFU_BASE                    optional, only changed for local tests
 // =====================================================================
 
+// The nets, in the order they show. To add one: copy a line, give it a new
+// key (lowercase, no spaces), name, short tag and description, then push.
+//   listen/talk: "private" = Private and up, "member" = everyone signed in,
+//                "allcall" = S3 + tonight's Squad Leader
 export const NETS = {
-  command: { name: "Command", short: "CMD", listen: "private", talk: "private", joinable: true },
-  air:     { name: "Air / Recon", short: "AIR", listen: "private", talk: "private", joinable: true },
-  allcall: { name: "All-call", short: "ALL", listen: "member", talk: "allcall", joinable: false },
+  command: { name: "Command", short: "CMD", listen: "private", talk: "private", joinable: true,
+             desc: "Fireteam leads talking to each other." },
+  recon:   { name: "Recon", short: "RCN", listen: "private", talk: "private", joinable: true,
+             desc: "Scouts and snipers calling out what they see." },
+  air:     { name: "Air Support", short: "AIR", listen: "private", talk: "private", joinable: true,
+             desc: "Heli pilots and air support calls." },
+  logi:    { name: "Logistics / Vehicles", short: "LOG", listen: "private", talk: "private", joinable: true,
+             desc: "Drivers, supply runs and vehicle moves." },
+  allcall: { name: "All-call", short: "ALL", listen: "member", talk: "allcall", joinable: false,
+             desc: "Tonight's Squad Leader and S3 can talk to everyone. Plays a chirp first." },
 };
 
 const json = (data, status = 200) =>

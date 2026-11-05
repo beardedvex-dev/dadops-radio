@@ -7,7 +7,9 @@ as normal. The radio adds:
 | Net | Who | Notes |
 |---|---|---|
 | **Command** | Private and up | Fireteam leads talking to each other. Left ear by default |
-| **Air / Recon** | Private and up | Pilots and recon who split off. Right ear by default |
+| **Recon** | Private and up | Scouts and snipers. Right ear by default |
+| **Air Support** | Private and up | Heli pilots and air support. Right ear by default |
+| **Logistics / Vehicles** | Private and up | Drivers and supply runs. Right ear by default |
 | **All-call** | Everyone listens; S3 and tonight's Squad Leader talk | Both ears, chirp first |
 
 **Status:** phase 1, the **browser test**. The desktop app (talk keys that
@@ -46,6 +48,11 @@ Test night: [TEST-NIGHT.md](TEST-NIGHT.md).
 | `public/index.html`, `radio.js`, `radio.css`, `patch.png` | The test page |
 | `SETUP.md` | One-time setup steps |
 | `TEST-NIGHT.md` | Checklist for the first test with the crew |
+
+**Adding or changing a net:** edit the `NETS` list at the top of
+`src/worker.js` (copy a line, change the key, name, short tag and
+description), then commit and push. A Nets screen for S3 is planned for
+phase 2.
 
 Secrets (in Cloudflare only, never in this repo): `REALTIME_APP_ID`,
 `REALTIME_APP_SECRET`.

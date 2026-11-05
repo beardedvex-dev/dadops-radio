@@ -16,7 +16,7 @@ Tick each one, and note anything odd.
 
 **Getting on**
 - [ ] Everyone gets to **On net** without errors
-- [ ] A Recruit (if one's around) sees Command and Air / Recon as "opens at
+- [ ] A Recruit (if one's around) sees Command, Recon, Air Support and Logistics as "opens at
       Private" and can only listen to All-call
 
 **Command**
@@ -37,8 +37,8 @@ Tick each one, and note anything odd.
 - [ ] You (S3) hold the All-call button: everyone on the radio hears it, in both ears
 - [ ] Someone who isn't S3 or tonight's Squad Leader has no All-call button
 
-**Air / Recon**
-- [ ] Two people join Air / Recon; it plays in the **right ear** and doesn't
+**Recon, Air Support, Logistics**
+- [ ] Two people join Recon (then Air Support, then Logistics); each plays in the **right ear** and doesn't
       show up on Command
 
 **Staying on**

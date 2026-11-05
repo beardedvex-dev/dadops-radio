@@ -12,11 +12,17 @@ const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "
 // ---------- settings kept in this browser ----------
 const DEFAULTS = {
   command: { key: { code: "KeyB" }, pan: -1, vol: 70 },
+  recon: { key: { code: "KeyH" }, pan: 1, vol: 60 },
   air: { key: { code: "KeyN" }, pan: 1, vol: 60 },
+  logi: { key: { code: "KeyJ" }, pan: 1, vol: 60 },
   allcall: { key: { code: "KeyM" }, pan: 0, vol: 85 },
 };
+const FALLBACK = { key: null, pan: 1, vol: 60 }; // for a net added later
 let settings = structuredClone(DEFAULTS);
-try { const s = JSON.parse(localStorage.getItem("dadops-radio") || "null"); if (s) for (const k of Object.keys(DEFAULTS)) settings[k] = { ...DEFAULTS[k], ...(s[k] || {}) }; } catch {}
+try { const s = JSON.parse(localStorage.getItem("dadops-radio") || "null"); if (s) for (const k of Object.keys(s)) settings[k] = { ...(DEFAULTS[k] || FALLBACK), ...(s[k] || {}) }; } catch {}
+// One key per net: if two nets ended up with the same key, the later one loses it.
+{ const seen = new Set(); for (const k of Object.keys(settings)) { const id = JSON.stringify(settings[k].key); if (settings[k].key && seen.has(id)) settings[k].key = null; seen.add(id); } }
+const S = (net) => (settings[net] ||= { ...FALLBACK });
 const save = () => { try { localStorage.setItem("dadops-radio", JSON.stringify(settings)); } catch {} };
 const keyLabel = (k) => {
   if (!k) return "None";
@@ -199,8 +205,8 @@ function mix() {
     const net = who && who.talking;
     const on = net && mine.includes(net);
     const t = R.ctx.currentTime;
-    p.gain.gain.setTargetAtTime(on ? settings[net].vol / 100 : 0, t, 0.015);
-    if (on) p.pan.pan.setTargetAtTime(settings[net].pan, t, 0.01);
+    p.gain.gain.setTargetAtTime(on ? S(net).vol / 100 : 0, t, 0.015);
+    if (on) p.pan.pan.setTargetAtTime(S(net).pan, t, 0.01);
   }
 }
 
@@ -248,7 +254,7 @@ window.addEventListener("blur", () => stopTalk());
 
 function setKey(net, key) {
   for (const n of Object.keys(settings)) if (n !== net && JSON.stringify(settings[n].key) === JSON.stringify(key)) settings[n].key = null;
-  settings[net].key = key; save(); endCapture();
+  S(net).key = key; save(); endCapture();
 }
 function endCapture() { R.capture = null; render(); }
 
@@ -287,7 +293,7 @@ function buildNets() {
   box.innerHTML = "";
   R.cards = {};
   for (const [key, net] of Object.entries(R.nets)) {
-    if (!R.can.listen.includes(key) && key !== "command" && key !== "air") continue;
+    if (!R.can.listen.includes(key) && !net.joinable) continue;
     const el = document.createElement("div");
     el.className = `net ${key}`;
     el.innerHTML = `
@@ -311,9 +317,9 @@ function buildNets() {
       <button class="ptt" data-r="ptt" hidden></button>
       <button class="join" data-r="join" hidden>Join net</button>`;
     const q = (r) => el.querySelector(`[data-r="${r}"]`);
-    el.querySelectorAll("[data-pan]").forEach((b) => (b.onclick = () => { settings[key].pan = +b.dataset.pan; save(); render(); mix(); }));
-    q("vol").value = settings[key].vol;
-    q("vol").oninput = (e) => { settings[key].vol = +e.target.value; save(); mix(); };
+    el.querySelectorAll("[data-pan]").forEach((b) => (b.onclick = () => { S(key).pan = +b.dataset.pan; save(); render(); mix(); }));
+    q("vol").value = S(key).vol;
+    q("vol").oninput = (e) => { S(key).vol = +e.target.value; save(); mix(); };
     // Use our own nets from the answer straight away, so a talk key works the moment you join.
     const setMine = (r) => { const me = R.roster.find((x) => x.conn === R.conn); if (me && r.nets) { me.nets = r.nets; render(); } };
     if (q("leave")) q("leave").onclick = () => { if (R.tx === key) stopTalk(true); ask({ t: "leave", net: key }).then(setMine).catch(() => {}); };
@@ -351,14 +357,14 @@ function render() {
     const keybox = q("keybox");
     if (canTalk && joined) {
       const waiting = R.capture === key;
-      keybox.innerHTML = `<button class="key ${waiting ? "wait" : ""}" title="Change this net's talk key">${waiting ? "PRESS A KEY" : esc(keyLabel(settings[key].key))}</button>`;
+      keybox.innerHTML = `<button class="key ${waiting ? "wait" : ""}" title="Change this net's talk key">${waiting ? "PRESS A KEY" : esc(keyLabel(S(key).key))}</button>`;
       keybox.firstChild.onclick = (e) => { e.stopPropagation(); R.capture = R.capture === key ? null : key; render(); };
     } else keybox.innerHTML = canListen && !canTalk && joined ? '<span class="count">Listen only</span>' : "";
 
     const desc = q("desc");
     if (!canListen) desc.textContent = `${net.name} opens at Private.`;
-    else if (!joined) desc.textContent = key === "air" ? "Pilots and recon who split off from the fireteams." : "Fireteam leads talking to each other.";
-    else if (key === "allcall") desc.textContent = canTalk ? "You can talk to everyone on the radio. Use it sparingly." : "Tonight's Squad Leader and S3 can talk to everyone. Plays a chirp first.";
+    else if (!joined) desc.textContent = net.desc || "";
+    else if (!net.joinable) desc.textContent = canTalk ? "You can talk to everyone on the radio. Use it sparingly." : (net.desc || "");
     else desc.textContent = "";
 
     const sp = q("speaking");
@@ -369,19 +375,19 @@ function render() {
 
     q("people").innerHTML = joined ? on.map((p) => `<span class="chip ${p.talking === key ? "on" : ""}">${esc(p.callsign)}${p.conn === R.conn ? " (you)" : ""}</span>`).join("") : "";
     q("controls").hidden = !joined;
-    el.querySelectorAll("[data-pan]").forEach((b) => b.setAttribute("aria-pressed", String(+b.dataset.pan === settings[key].pan)));
+    el.querySelectorAll("[data-pan]").forEach((b) => b.setAttribute("aria-pressed", String(+b.dataset.pan === S(key).pan)));
     q("join").hidden = joined || !canListen || !net.joinable;
     const ptt = q("ptt");
     ptt.hidden = !(joined && canTalk);
     ptt.classList.toggle("tx", R.tx === key);
-    ptt.textContent = R.tx === key ? `Talking on ${net.name}` : `Hold to talk on ${net.name}  ·  ${keyLabel(settings[key].key)}`;
+    ptt.textContent = R.tx === key ? `Talking on ${net.name}` : `Hold to talk on ${net.name}  ·  ${keyLabel(S(key).key)}`;
   }
 
   const foot = document.querySelector(".foot");
   foot.classList.toggle("tx", !!R.tx);
   const first = R.can.talk.find((n) => mine.includes(n));
   $("foot-text").textContent = !R.micTrack ? "Listen only" : R.tx ? `Talking on ${R.nets[R.tx].name}` :
-    first ? `Hold ${keyLabel(settings[first].key)} to talk on ${R.nets[first].name}` : "Join a net to talk";
+    first ? `Hold ${keyLabel(S(first).key)} to talk on ${R.nets[first].name}` : "Join a net to talk";
   mix();
 }
 

@@ -88,7 +88,8 @@ Leave the **Site URL** alone. It stays `https://dadops.gg`.
 
 1. Open your radio address in Chrome or Edge.
 2. **Sign in with Discord** → **Get on net** → allow the microphone.
-3. You should see **On net** at the top, and Command, Air / Recon and
+3. You should see **On net** at the top, and Command, Recon, Air Support,
+   Logistics / Vehicles and
    All-call underneath.
 4. Open the same address on your phone or a second browser and sign in as
    yourself again. Join Command on both, hold the talk button on one, and
@@ -110,7 +111,7 @@ Leave the **Site URL** alone. It stays `https://dadops.gg`.
 | Who | Hears | Can talk on |
 |---|---|---|
 | Recruit | All-call | nothing (listen only) |
-| Private and up, plus S3, S6, Quartermasters, Armorers, Scouts, Founders (the same people the Private-only pages let in) | All-call, plus Command and Air / Recon if they join them | Command, Air / Recon |
+| Private and up, plus S3, S6, Quartermasters, Armorers, Scouts, Founders (the same people the Private-only pages let in) | All-call, plus Command, Recon, Air Support and Logistics / Vehicles if they join them | those four |
 | S3, and whoever is **tonight's Squad Leader** on the ops board | same as above | All-call too |
 
 "Tonight's Squad Leader" is whoever is set as lead on an op that started in
