@@ -19,7 +19,8 @@ function draw(s) {
     return;
   }
   if (!s || !s.on) { wrap.innerHTML = ""; return; }
-  const head = '<div class="head"><img src="build/icon.png" alt=""><span>DAD NET</span></div>';
+  const pick = s.pick ? `<span class="pick">📞 ${esc(s.pick)}</span>` : "";
+  const head = `<div class="head"><img src="build/icon.png" alt=""><span>DAD NET</span>${pick}</div>`;
   if (s.status && s.status !== "On net") {
     wrap.innerHTML = head + `<div class="row down"><span class="tag">RADIO</span><span>${esc(s.status)}...</span></div>`;
     return;
@@ -27,7 +28,7 @@ function draw(s) {
   const nets = s.nets || [];
   const busy = nets.filter((n) => n.talker || n.you);
   if (!busy.length) {
-    wrap.innerHTML = `<div class="row"><img src="build/icon.png" alt="" style="width:16px;height:16px"><span class="tag" style="border:0;padding:0">${esc(nets.map((n) => n.short).join(" · ") || "RADIO")}</span><span class="quiet">on net</span></div>`;
+    wrap.innerHTML = `<div class="row"><img src="build/icon.png" alt="" style="width:16px;height:16px"><span class="tag" style="border:0;padding:0">${esc(nets.map((n) => n.short).join(" · ") || "RADIO")}</span><span class="quiet">on net</span>${pick}</div>`;
     return;
   }
   wrap.innerHTML = head + busy.map((n) => n.you

@@ -73,10 +73,29 @@ Test night: [TEST-NIGHT.md](TEST-NIGHT.md).
 | `DESKTOP.md` | Building, installing and using the desktop app |
 | `site/` | radio.dadops.gg, Dad Net's home page (own Vercel project). Steps: `HOME-PAGE.md` |
 
-**Adding or changing a net:** edit the `NETS` list at the top of
-`src/worker.js` (copy a line, change the key, name, short tag and
-description), then commit and push. A Nets screen for S3 is planned for
-phase 2.
+**Adding or changing a net (v0.6):** the **Nets** button on the radio
+(BeardedVeX and S3 - Core only, checked with dadops.gg's `desk_can('health')`)
+opens the Nets screen: add, rename, reorder or delete nets, set who listens
+(everyone, or Private and up) and who talks (Private and up; leads = FTL seats,
+Sergeants and up, Squad Leader, S3; Squad Leader and S3; S3 only), always on
+or join/leave, and the default ear. **Add a net for tonight** makes one that
+goes away at 6 AM Eastern. Command can't be deleted (FTL seats talk there).
+Changes go live for everyone straight away; the switchboard keeps them. The
+`NETS` list in `src/worker.js` is only the starting set (**Put back the
+starting nets** restores it).
+
+**Direct line (v0.6):** talk to one person. Pick them (click their name on a
+net or the Battle Board, the Calling list, or the Next key in-game), then hold
+the Direct key. With nobody picked, the Direct key replies to whoever called you
+last. Private and up can start a call; anyone on Dad Net can be called. Only
+the person called hears it on their radio. (Everyone's app receives everyone's
+voice and plays only what's meant for it, so it isn't encrypted end to end.)
+
+**Turn Discord down (app v0.6, Windows):** lowers Discord's slider in the
+Windows Volume Mixer while the radio talks to you (or while anyone talks,
+you too), to a level you pick or muted, then puts it back. `desktop/duck.ps1`
+does it (a small PowerShell helper the app starts once); `desktop/duck.js`
+drives it.
 
 Secrets (in Cloudflare only, never in this repo): `REALTIME_APP_ID`,
 `REALTIME_APP_SECRET`, and optionally `DISCORD_BOT_TOKEN` + `DISCORD_RALLY_POINT_ID`

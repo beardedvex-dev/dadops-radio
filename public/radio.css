@@ -197,3 +197,29 @@ body.kit .headbtns{margin-top:2px}
 body.kit .head{flex-wrap:wrap}
 .route{font-size:12px;margin-top:2px}
 body.kit #route{font:500 10px "IBM Plex Mono",monospace;letter-spacing:.08em;text-transform:uppercase;color:#8f8770}
+/* v0.6: the direct line and the Nets screen */
+.dl-wrap{margin-top:10px}
+body.kit .dl-wrap{padding:0}
+.net.direct .net-name{color:var(--tan)}
+.net.direct .klbl.dk{font:600 10px "IBM Plex Mono",monospace;letter-spacing:.1em;color:var(--olive-light)}
+.net.direct .speaking.you{background:#2A2215}
+.net.direct .ptt:disabled{opacity:.5;cursor:default}
+.dl-pick{display:flex;align-items:center;gap:10px;font-size:13px}
+.dl-pick select,.nform select,.nform input:not([type=checkbox]){flex:1;min-height:32px;background:#15140F;color:var(--cream);border:1px solid var(--line2);border-radius:6px;padding:0 8px;font:inherit;font-size:14px}
+.chip[data-pick]{cursor:pointer}
+.chip[data-pick]:hover{outline:1px solid var(--tan-dark)}
+.chip.picked{outline:1px solid var(--tan);color:var(--tan)}
+body.kit .net.direct .ptt{display:block;min-height:36px;font-size:13px}
+.nets-screen{padding:0 20px 20px;display:flex;flex-direction:column;gap:10px}
+body.kit .nets-screen{padding:0}
+.nl{display:flex;flex-direction:column;gap:6px}
+.nrow{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:8px 10px;background:var(--panel);border:1px solid var(--line);border-radius:8px}
+.nrow .muted{font-size:12px}
+.nrow button:disabled{opacity:.35}
+.tag.tonight{color:var(--tan);border-color:var(--tan-dark)}
+button.sure{border-color:var(--red)!important;color:#ffb3ad!important}
+.nform{max-width:none;margin:0;gap:10px}
+.nform label{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--muted)}
+.nform label.opt{flex-direction:row;color:var(--soft)}
+body.kit .nform{background:#15150f;border-color:#3a3528}
+#duck-state.good{color:var(--olive-light)} #duck-state.bad{color:#ffb3ad}

@@ -83,3 +83,7 @@ body.in-kit .squad{overflow:auto}
 .foot{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;font:600 10px "IBM Plex Mono",monospace;letter-spacing:.14em;color:#6f6750}
 .foot a{color:var(--olive-light);letter-spacing:.06em}
 ::-webkit-scrollbar{width:6px} ::-webkit-scrollbar-track{background:transparent} ::-webkit-scrollbar-thumb{background:#3a3528;border-radius:3px}
+.team li[data-pick]{cursor:pointer;border-radius:4px}
+.team li[data-pick]:hover{background:#262115}
+.team li.picked .cs{color:var(--tan)}
+.pickhint{margin-top:6px;font-size:12px}

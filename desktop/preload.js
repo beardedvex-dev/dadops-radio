@@ -17,4 +17,7 @@ contextBridge.exposeInMainWorld("dadopsDesktop", {
   // v0.5+
   overlayCmd: (o) => ipcRenderer.send("dadops:overlay-set", o), // { corner, scale, opacity, move }
   onNetCmd: (fn) => ipcRenderer.on("dadops:netcmd", (_e, c) => fn(c)), // tray: "off" / "on"
+  // v0.6+
+  duck: (on) => ipcRenderer.send("dadops:duck", !!on), // the radio's talking: turn Discord down
+  duckTest: () => ipcRenderer.invoke("dadops:duck-test"),
 });

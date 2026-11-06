@@ -5,7 +5,7 @@
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/+esm";
 
 const $ = (id) => document.getElementById(id);
-const VIEWS = ["v-signin", "v-ready", "v-net", "v-denied", "v-off"];
+const VIEWS = ["v-signin", "v-ready", "v-net", "v-denied", "v-off", "v-nets"];
 const show = (v) => VIEWS.forEach((id) => ($(id).hidden = id !== v));
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 
@@ -16,6 +16,9 @@ const DEFAULTS = {
   air: { key: { code: "KeyN" }, pan: 1, vol: 60 },
   logi: { key: { code: "KeyJ" }, pan: 1, vol: 60 },
   allcall: { key: { code: "KeyM" }, pan: 0, vol: 85 },
+  // The direct line: one key to talk to the person you picked (or reply), one to step through people.
+  direct: { key: { code: "KeyK" }, pan: 0, vol: 85 },
+  cycle: { key: { code: "KeyL" } },
 };
 const FALLBACK = { key: null, pan: 1, vol: 60 }; // for a net added later
 // In the desktop app, keys work everywhere (even while typing), so start on mouse buttons
@@ -23,12 +26,14 @@ const FALLBACK = { key: null, pan: 1, vol: 60 }; // for a net added later
 if (window.dadopsDesktop) {
   DEFAULTS.command.key = { button: 4 }; DEFAULTS.allcall.key = { button: 3 };
   DEFAULTS.recon.key = null; DEFAULTS.air.key = null; DEFAULTS.logi.key = null;
+  DEFAULTS.direct.key = null; DEFAULTS.cycle.key = null;
 }
 let settings = structuredClone(DEFAULTS);
 try { const s = JSON.parse(localStorage.getItem("dadops-radio") || "null"); if (s) for (const k of Object.keys(s)) settings[k] = { ...(DEFAULTS[k] || FALLBACK), ...(s[k] || {}) }; } catch {}
 // One key per net: if two nets ended up with the same key, the later one loses it.
 { const seen = new Set(); for (const k of Object.keys(settings)) { const id = JSON.stringify(settings[k].key); if (settings[k].key && seen.has(id)) settings[k].key = null; seen.add(id); } }
-const S = (net) => (settings[net] ||= { ...FALLBACK });
+// A net added on the Nets screen starts in the ear it was set up with.
+const S = (net) => (settings[net] ||= { ...FALLBACK, pan: R.nets && R.nets[net] && [-1, 0, 1].includes(R.nets[net].ear) ? R.nets[net].ear : FALLBACK.pan });
 const save = () => { try { localStorage.setItem("dadops-radio", JSON.stringify(settings)); } catch {} };
 const keyLabel = (k) => {
   if (!k) return "None";
@@ -52,6 +57,7 @@ const R = {
   pipes: new Map(), // conn -> { gain, pan, el, analyser }
   midToConn: new Map(), pulled: new Set(),
   tx: null, capture: null, cards: {}, retry: 0, stopping: false, seats: [], off: false,
+  directPick: null, lastCaller: null, incoming: new Map(), // the direct line
 };
 window.__radio = R; // handy when testing from the browser console
 // Set when this page is running inside the Dad Net desktop app.
@@ -134,6 +140,18 @@ function onMessage(m) {
   if (m.re && R.waiting.has(m.re)) { const w = R.waiting.get(m.re); R.waiting.delete(m.re); return w.ok(m); }
   if (m.t === "error" && !m.re) { R.lastTalkErr = m.reason; showLastKey(); if (R.tx) { R.tx = null; if (R.micTrack) R.micTrack.enabled = false; render(); } flash(m.reason); return; }
   if (m.t === "roster") { R.roster = m.members; if (m.seats) R.seats = m.seats; render(); pullAll(); }
+  else if (m.t === "nets") { // the Nets screen changed something
+    R.nets = m.nets; R.can = m.can;
+    const me = myEntry();
+    if (me && m.mine) { me.nets = m.mine.nets; me.monitor = m.mine.monitor; }
+    if (R.tx && R.tx !== "direct" && !canTalkHere(R.tx)) stopTalk(true);
+    buildNets(); render(); netsScreen();
+  }
+  else if (m.t === "direct") { // someone's talking to you on the direct line (or stopped)
+    if (m.on) { R.incoming.set(m.from, m.callsign); R.lastCaller = m.from; chirp(1750, 0.06); }
+    else R.incoming.delete(m.from);
+    render();
+  }
   else if (m.t === "mine") { // the switchboard moved us (an FTL seat taken or lost)
     const me = myEntry();
     if (me) { me.nets = m.nets || []; me.monitor = m.monitor || []; }
@@ -358,12 +376,28 @@ function mix() {
   const mine = myNets();
   for (const [conn, p] of R.pipes) {
     const who = R.roster.find((x) => x.conn === conn);
+    const t = R.ctx.currentTime;
+    if (R.incoming.has(conn)) { // talking to you on the direct line
+      p.gain.gain.setTargetAtTime(S("direct").vol / 100, t, 0.015);
+      p.pan.pan.setTargetAtTime(S("direct").pan || 0, t, 0.01);
+      continue;
+    }
     const net = who && who.talking;
     const on = net && mine.includes(net);
-    const t = R.ctx.currentTime;
     p.gain.gain.setTargetAtTime(on ? S(net).vol / 100 : 0, t, 0.015);
     if (on) p.pan.pan.setTargetAtTime(S(net).pan, t, 0.01);
   }
+  duckDiscord();
+}
+// Turn Discord down (desktop app v0.6+): while someone's talking to you, or while anyone is (you too).
+let ducked = false;
+function duckDiscord() {
+  if (!DESK || !DESK.duck) return;
+  const mode = deskPrefs.duckMode || "others";
+  const mine = myNets();
+  const others = R.incoming.size > 0 || R.roster.some((p) => p.conn !== R.conn && p.talking && mine.includes(p.talking));
+  const want = mode !== "off" && (others || (mode === "anyone" && !!R.tx));
+  if (want !== ducked) { ducked = want; DESK.duck(want); }
 }
 
 function myNets() { const me = R.roster.find((x) => x.conn === R.conn); return me ? me.nets : []; }
@@ -372,9 +406,10 @@ function myEntry() { return R.roster.find((x) => x.conn === R.conn); }
 // Can I talk on this net at all? Command also opens to whoever holds a fireteam's FTL seat.
 function canTalkNet(n) {
   if (!R.can) return false;
+  if (n === "direct" || n === "cycle") return !!(R.me && R.me.level === "private"); // the direct line opens at Private
   if (R.can.talk.includes(n)) return true;
   const me = myEntry();
-  return n === "command" && !!(me && me.ftl);
+  return !!(R.nets[n] && R.nets[n].talk === "lead" && me && me.ftl); // an FTL seat opens the leads' nets
 }
 const canTalkHere = (n) => canTalkNet(n) && myNets().includes(n) && !myMonitor().includes(n);
 
@@ -382,8 +417,41 @@ const canTalkHere = (n) => canTalkNet(n) && myNets().includes(n) && !myMonitor()
 function roleTag(p) { return p.ftl ? `${p.ftl} FTL` : p.squadLeader ? "SL" : p.voice ? p.voice.tag : ""; }
 const withTag = (p) => p.callsign + (roleTag(p) ? ` · ${roleTag(p)}` : "");
 
+// ---------- the direct line ----------
+const onNet = (c) => !!c && c !== R.conn && R.roster.some((p) => p.conn === c);
+// Who the direct key calls: the one you picked, or else whoever called you last.
+function directTarget() { return onNet(R.directPick) ? R.directPick : onNet(R.lastCaller) ? R.lastCaller : null; }
+const nameOf = (c) => (R.roster.find((p) => p.conn === c) || {}).callsign || "";
+function startDirect() {
+  if (R.tx || !R.micTrack || !canTalkNet("direct")) return;
+  const to = directTarget();
+  if (!to) { flash("Pick someone to call first: click their name, or press your cycle key."); return; }
+  R.tx = "direct"; R.txTo = to;
+  R.micTrack.enabled = true;
+  tell({ t: "talk", direct: to });
+  chirp(1800, 0.05);
+  render();
+}
+// The cycle key: the next person, people on your nets first.
+function cycleDirect() {
+  const mine = myNets();
+  const list = R.roster.filter((p) => p.conn !== R.conn)
+    .sort((a, b) => Number(!a.nets.some((n) => mine.includes(n))) - Number(!b.nets.some((n) => mine.includes(n))) || a.callsign.localeCompare(b.callsign));
+  if (!list.length) { flash("Nobody else is on Dad Net."); return; }
+  const i = list.findIndex((p) => p.conn === R.directPick);
+  pickDirect(list[(i + 1) % list.length].conn, true);
+}
+function pickDirect(conn, quiet) {
+  R.directPick = onNet(conn) ? conn : null;
+  if (R.directPick && !quiet) flash(`Direct line: ${nameOf(conn)}. Hold ${keyLabel(S("direct").key)} to talk to just them.`);
+  chirp(1200, 0.03);
+  render();
+}
+
 // ---------- talking ----------
 function startTalk(net) {
+  if (net === "cycle") return cycleDirect();
+  if (net === "direct") return startDirect();
   if (R.tx || !R.micTrack || !canTalkNet(net) || !myNets().includes(net) || myMonitor().includes(net)) return;
   R.tx = net;
   R.micTrack.enabled = true;
@@ -397,7 +465,7 @@ function stopTalk(now) {
   R.tx = null;
   const done = () => { if (!R.tx && R.micTrack) R.micTrack.enabled = false; tell({ t: "talk", net: null }); };
   now ? done() : setTimeout(done, 150); // a short tail so the last word isn't cut off
-  chirp(net === "allcall" ? 660 : 1000, 0.05);
+  chirp(net === "allcall" ? 660 : net === "direct" ? 1300 : 1000, 0.05);
   render();
 }
 
@@ -495,6 +563,16 @@ function desktopSetup() {
       if (cleared) { save(); render(); }
     }
     if (p.update) $("update-text").textContent = `Update ready (v${p.update}).`;
+    if (DESK.duck && p.duckMode !== undefined) { // v0.6+: turn Discord down
+      $("duck-row").hidden = false;
+      $("duck-mode").value = p.duckMode;
+      if (document.activeElement !== $("duck-level")) $("duck-level").value = p.duckLevel;
+      $("duck-level-val").textContent = +$("duck-level").value === 0 ? "muted" : `${$("duck-level").value}%`;
+      $("duck-level").disabled = $("duck-test").disabled = p.duckMode === "off" || !p.duckAvailable;
+      $("duck-state").textContent = !p.duckAvailable ? "Only in the Windows app." : p.duckStatus || "";
+      $("duck-state").className = "muted " + (/^Not working/.test(p.duckStatus || "") ? "bad" : /^Working/.test(p.duckStatus || "") ? "good" : "");
+      if (p.duckMode === "off" && ducked) ducked = false;
+    }
     if (DESK.overlayCmd && p.overlayCorner !== undefined) {
       $("ovl-row").hidden = false;
       $("ovl-corner").value = p.overlayCorner;
@@ -517,6 +595,12 @@ function desktopSetup() {
   if (DESK.pda) {
     $("pda-open").onclick = () => DESK.pda(true);
     $("pda-key").onclick = () => DESK.setPdaKey();
+  }
+  if (DESK.duck) {
+    $("duck-mode").onchange = (e) => { DESK.setPrefs({ duckMode: e.target.value }).then(apply); ducked = false; duckDiscord(); };
+    $("duck-level").oninput = (e) => { $("duck-level-val").textContent = +e.target.value === 0 ? "muted" : `${e.target.value}%`; };
+    $("duck-level").onchange = (e) => DESK.setPrefs({ duckLevel: +e.target.value }).then(apply);
+    $("duck-test").onclick = async () => { $("duck-test").disabled = true; $("duck-state").textContent = "Turning Discord down for 2 seconds..."; await DESK.duckTest().catch(() => {}); $("duck-test").disabled = false; };
   }
   if (DESK.overlayCmd) { // v0.5+: put the overlay where you want it
     $("ovl-corner").onchange = (e) => DESK.overlayCmd({ corner: e.target.value });
@@ -546,7 +630,11 @@ function pushOverlay() {
     nets: Object.keys(R.nets).filter((n) => mine.includes(n)).map((n) => {
       const t = R.roster.find((p) => p.talking === n && p.conn !== R.conn);
       return { key: n, short: R.nets[n].short, name: R.nets[n].name, talker: t ? withTag(t) : null, you: R.tx === n, alert: !R.nets[n].joinable };
-    }),
+    }).concat(
+      // The direct line: you talking to someone, and anyone talking to you.
+      R.tx === "direct" ? [{ key: "direct", short: "DM", name: `Direct · ${nameOf(R.txTo)}`, talker: null, you: true, alert: false }] : [],
+      [...R.incoming.values()].map((c) => ({ key: "direct", short: "DM", name: "Direct", talker: `${c} (direct)`, you: false, alert: false }))),
+    pick: canTalkNet("direct") && directTarget() ? nameOf(directTarget()) : null,
   });
 }
 
@@ -674,6 +762,7 @@ function render() {
   const mine0 = R.roster.find((x) => x.conn === R.conn);
   const myVoice = mine0 && mine0.voice;
   $("whoami").textContent = `Signed in as ${me.callsign} (${role})` + (myVoice ? ` · Discord: ${myVoice.name}` : "");
+  $("nets-open").hidden = !me.netsBoss;
   $("kit-discord").textContent = myVoice ? `Discord: ${myVoice.name}` : "";
   const mine = myNets();
 
@@ -712,7 +801,8 @@ function render() {
     } else sp.hidden = true;
 
     q("people").innerHTML = joined ? on.map((p) => { const mon = (p.monitor || []).includes(key);
-      return `<span class="chip ${p.talking === key ? "on" : ""} ${mon ? "mon" : ""}" ${mon ? 'title="Monitoring (listen only)"' : ""}>${esc(withTag(p))}${p.conn === R.conn ? " (you)" : ""}${mon ? " · listening" : ""}</span>`; }).join("") : "";
+      const me = p.conn === R.conn, pick = !me && canTalkNet("direct");
+      return `<span class="chip ${p.talking === key ? "on" : ""} ${mon ? "mon" : ""} ${R.directPick === p.conn ? "picked" : ""}" ${pick ? `data-pick="${esc(p.conn)}" role="button" tabindex="0" title="${mon ? "Monitoring (listen only). " : ""}Click to pick ${esc(p.callsign)} for your direct line"` : mon ? 'title="Monitoring (listen only)"' : ""}>${R.directPick === p.conn ? "📞 " : ""}${esc(withTag(p))}${me ? " (you)" : ""}${mon ? " · listening" : ""}</span>`; }).join("") : "";
     const mode = q("mode");
     if (mode) { mode.hidden = !(joined && canTalk); mode.querySelectorAll("[data-mode]").forEach((b) => b.setAttribute("aria-pressed", String((b.dataset.mode === "monitor") === monitoring))); }
     q("controls").hidden = !joined;
@@ -730,13 +820,118 @@ function render() {
   const foot = document.querySelector(".foot");
   foot.classList.toggle("tx", !!R.tx);
   const first = Object.keys(R.nets).find((n) => canTalkHere(n));
-  $("foot-text").textContent = !R.micTrack ? "Listen only" : R.tx ? `Talking on ${R.nets[R.tx].name}` :
+  $("foot-text").textContent = !R.micTrack ? "Listen only" : R.tx === "direct" ? `Talking to ${nameOf(R.txTo)} (direct)` : R.tx ? `Talking on ${(R.nets[R.tx] || { name: R.tx }).name}` :
     first ? `Hold ${keyLabel(S(first).key)} to talk on ${R.nets[first].name}` : "Join a net to talk";
   renderSeats();
+  renderDirect();
   mix();
   pushOverlay();
   feedBoard();
 }
+
+// ---------- the direct line card ----------
+function renderDirect() {
+  const box = $("direct"); if (!box) return;
+  box.hidden = false;
+  const can = canTalkNet("direct");
+  const incoming = [...R.incoming.values()];
+  const others = R.roster.filter((p) => p.conn !== R.conn).sort((a, b) => a.callsign.localeCompare(b.callsign));
+  const to = directTarget();
+  const keyBtn = (k, title) => { const waiting = R.capture === k; return `<button class="key ${waiting ? "wait" : ""}" data-dkey="${k}" title="${title}">${waiting ? "PRESS A KEY" : esc(keyLabel(S(k).key))}</button>`; };
+  // Don't rebuild under an open dropdown.
+  if (box.contains(document.activeElement) && document.activeElement.tagName === "SELECT") return;
+  box.classList.toggle("live", incoming.length > 0 || R.tx === "direct");
+  box.innerHTML = `<div class="net-top"><span class="net-name">DIRECT LINE</span><span class="count">${others.length} on Dad Net</span><span class="grow"></span>
+      ${can ? `<span class="klbl dk">Talk</span>${keyBtn("direct", "Your direct line talk key")}<span class="klbl dk">Next</span>${keyBtn("cycle", "Step to the next person")}` : ""}</div>
+    ${incoming.length ? `<div class="speaking">📞 <b>${esc(incoming.join(", "))}</b> ${incoming.length === 1 ? "is" : "are"} talking to you</div>` : ""}
+    ${R.tx === "direct" ? `<div class="speaking you">📞 You're talking to <b>${esc(nameOf(R.txTo))}</b> only</div>` : ""}
+    ${can ? `<label class="dl-pick"><span class="muted">Calling</span>
+      <select id="dl-pick" aria-label="Who your direct line calls">
+        <option value="">${onNet(R.lastCaller) ? `Whoever called last (${esc(nameOf(R.lastCaller))})` : "Nobody picked: replies to whoever calls you"}</option>
+        ${others.map((p) => `<option value="${esc(p.conn)}"${R.directPick === p.conn ? " selected" : ""}>${esc(withTag(p))}</option>`).join("")}
+      </select></label>
+      <p class="desc">Talk to one person, wherever they are on Dad Net. Pick them here, click their name on a net, or press your Next key to step through people. Others can't hear it on their radio.</p>
+      <button class="ptt" id="dl-ptt" ${to ? "" : "disabled"}>${R.tx === "direct" ? `Talking to ${esc(nameOf(R.txTo))}` : to ? `Hold to talk to ${esc(nameOf(to))}  ·  ${esc(keyLabel(S("direct").key))}` : "Pick someone to call"}</button>`
+      : `<p class="desc">The direct line opens at Private. You'll still hear anyone who calls you.</p>`}
+    <div class="controls dl-controls"><label class="vol">Vol <input type="range" min="0" max="100" value="${S("direct").vol}" id="dl-vol" aria-label="Direct line volume"></label></div>`;
+}
+$("direct").addEventListener("click", (e) => {
+  const k = e.target.closest("[data-dkey]");
+  if (k) { e.stopPropagation(); R.capture = R.capture === k.dataset.dkey ? null : k.dataset.dkey; render(); }
+});
+$("direct").addEventListener("change", (e) => { if (e.target.id === "dl-pick") { pickDirect(e.target.value || null, true); e.target.blur(); } });
+$("direct").addEventListener("input", (e) => { if (e.target.id === "dl-vol") { S("direct").vol = +e.target.value; save(); mix(); } });
+$("direct").addEventListener("pointerdown", (e) => { const b = e.target.closest("#dl-ptt"); if (b && !b.disabled) { e.preventDefault(); b.setPointerCapture(e.pointerId); startDirect(); } });
+$("direct").addEventListener("pointerup", (e) => { if (e.target.closest("#dl-ptt") && R.tx === "direct") stopTalk(); });
+$("direct").addEventListener("pointercancel", () => { if (R.tx === "direct") stopTalk(); });
+// Clicking someone's name on a net picks them for the direct line.
+$("nets").addEventListener("click", (e) => { const c = e.target.closest("[data-pick]"); if (c) pickDirect(c.dataset.pick); });
+$("nets").addEventListener("keydown", (e) => { const c = e.target.closest("[data-pick]"); if (c && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); pickDirect(c.dataset.pick); } });
+
+// ---------- the Nets screen (BeardedVeX and S3 - Core) ----------
+const LISTEN_TXT = { member: "Everyone (Recruits too)", private: "Private and up" };
+const TALK_TXT = { private: "Private and up", lead: "Leads: FTL seats, Sergeants and up, Squad Leader, S3", allcall: "Tonight's Squad Leader and S3", s3: "S3 only" };
+const EAR_TXT = { "-1": "Left ear", "0": "Both ears", "1": "Right ear" };
+let netEdit = null, netSure = null;
+function netsScreen() {
+  const box = $("nets-screen"); if (!box || $("v-nets").hidden || !R.me) return;
+  const keys = Object.keys(R.nets);
+  const f = netEdit;
+  const opts = (map, v) => Object.entries(map).map(([k, t]) => `<option value="${k}"${String(v) === k ? " selected" : ""}>${esc(t)}</option>`).join("");
+  box.innerHTML = `
+    <p class="muted">Changes go live for everyone on Dad Net straight away. Command always stays (FTL seats talk there).</p>
+    <div class="nl">${keys.map((k, i) => { const n = R.nets[k]; return `<div class="nrow" data-k="${esc(k)}">
+      <span class="tag">${esc(n.short)}</span>
+      <div class="grow"><b>${esc(n.name)}</b>${n.oneOff ? ' <span class="tag tonight">TONIGHT ONLY</span>' : ""}${n.joinable ? "" : ' <span class="tag">ALWAYS ON</span>'}
+        <div class="muted">Listen: ${esc(LISTEN_TXT[n.listen])} · Talk: ${esc(TALK_TXT[n.talk])} · ${esc(EAR_TXT[String(n.ear ?? 1)])}</div></div>
+      <button class="ghost small" data-nm="-1" ${i ? "" : "disabled"} aria-label="Move ${esc(n.name)} up">↑</button>
+      <button class="ghost small" data-nm="1" ${i < keys.length - 1 ? "" : "disabled"} aria-label="Move ${esc(n.name)} down">↓</button>
+      <button class="ghost small" data-ne>Edit</button>
+      ${k === "command" ? "" : `<button class="ghost small ${netSure === k ? "sure" : ""}" data-nd>${netSure === k ? "Sure? Tap again" : "Delete"}</button>`}
+    </div>`; }).join("")}</div>
+    ${f ? `<form class="box nform" id="net-form">
+      <div class="label">${f.key ? `EDIT ${esc((R.nets[f.key] || {}).name || "").toUpperCase()}` : f.oneOff ? "NEW NET FOR TONIGHT" : "NEW NET"}</div>
+      <label>Name <input name="name" maxlength="30" required value="${esc(f.name || "")}" placeholder="Like Armor or Bravo Squad"></label>
+      <label>Short tag (2 to 5) <input name="short" maxlength="5" required value="${esc(f.short || "")}" placeholder="ARM"></label>
+      <label>What it's for <input name="desc" maxlength="140" value="${esc(f.desc || "")}" placeholder="One line people see under the name"></label>
+      <label>Who can listen <select name="listen">${opts(LISTEN_TXT, f.listen || "private")}</select></label>
+      <label>Who can talk <select name="talk">${opts(TALK_TXT, f.talk || "private")}</select></label>
+      <label>Starts in <select name="ear">${opts(EAR_TXT, f.ear ?? 1)}</select></label>
+      <label class="opt"><input type="checkbox" name="joinable" ${f.joinable === false ? "" : "checked"}> People join it (untick: everyone who can listen is always on it)</label>
+      ${f.key ? "" : `<label class="opt"><input type="checkbox" name="oneOff" ${f.oneOff ? "checked" : ""}> Tonight only (it goes away at 6 AM Eastern)</label>`}
+      <p class="muted" id="net-err" role="alert"></p>
+      <div class="update-line"><button class="join" type="submit">Save</button><button class="ghost small" type="button" id="net-cancel">Cancel</button></div>
+    </form>` : `<div class="update-line"><button class="join" id="net-add">Add a net</button><button class="join" id="net-tonight">Add a net for tonight</button>
+      <button class="ghost small ${netSure === "__reset" ? "sure" : ""}" id="net-reset">${netSure === "__reset" ? "Sure? Tap again" : "Put back the starting nets"}</button></div>`}`;
+}
+async function netsAsk(msg) {
+  try { const r = await ask(msg); if (r.t === "error") { flash(r.reason); const e = $("net-err"); if (e) e.textContent = r.reason; return false; } return true; }
+  catch (e) { flash(e.message); return false; }
+}
+$("nets-screen").addEventListener("click", async (e) => {
+  const row = e.target.closest(".nrow"), k = row && row.dataset.k;
+  if (e.target.closest("[data-nm]")) { netSure = null; await netsAsk({ t: "nets:move", key: k, dir: +e.target.closest("[data-nm]").dataset.nm }); return; }
+  if (e.target.closest("[data-ne]")) { netSure = null; netEdit = { key: k, ...R.nets[k] }; netsScreen(); return; }
+  if (e.target.closest("[data-nd]")) {
+    if (netSure !== k) { netSure = k; netsScreen(); return; }
+    netSure = null; await netsAsk({ t: "nets:delete", key: k }); netsScreen(); return;
+  }
+  if (e.target.id === "net-add" || e.target.id === "net-tonight") { netSure = null; netEdit = { oneOff: e.target.id === "net-tonight", joinable: true, ear: 1 }; netsScreen(); $("net-form")?.querySelector("input")?.focus(); return; }
+  if (e.target.id === "net-cancel") { netEdit = null; netsScreen(); return; }
+  if (e.target.id === "net-reset") {
+    if (netSure !== "__reset") { netSure = "__reset"; netsScreen(); return; }
+    netSure = null; await netsAsk({ t: "nets:reset" }); netsScreen();
+  }
+});
+$("nets-screen").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const fd = new FormData(e.target);
+  const net = { key: netEdit && netEdit.key, name: fd.get("name"), short: fd.get("short"), desc: fd.get("desc"), listen: fd.get("listen"), talk: fd.get("talk"),
+    ear: +fd.get("ear"), joinable: fd.get("joinable") === "on" };
+  if (await netsAsk({ t: "nets:save", net, oneOff: fd.get("oneOff") === "on" })) { netEdit = null; netsScreen(); }
+});
+$("nets-open").onclick = () => { netEdit = null; netSure = null; show("v-nets"); netsScreen(); };
+$("nets-back").onclick = () => { netEdit = null; show(R.off ? "v-off" : "v-net"); };
 
 // ---------- fireteams and FTL seats ----------
 // One FTL seat per Discord "Fireteam" channel. Anyone Private+ in that channel can take it;
@@ -803,7 +998,13 @@ $("backon").onclick = backOn;
 // The board (board.html) is its own page: in the app it folds out beside the radio,
 // in a browser it opens in its own window. This page tells it what's going on.
 let boardChan = null;
-try { boardChan = new BroadcastChannel("dad-net"); boardChan.onmessage = (e) => { if (e.data && e.data.t === "hello") feedBoard(); }; } catch {}
+try {
+  boardChan = new BroadcastChannel("dad-net");
+  boardChan.onmessage = (e) => {
+    if (e.data && e.data.t === "hello") feedBoard();
+    if (e.data && e.data.t === "pick" && typeof e.data.conn === "string") pickDirect(e.data.conn, true); // a name clicked on the Battle Board
+  };
+} catch {}
 function feedBoard() {
   if (!boardChan) return;
   const st = R.off || !R.me ? { off: R.off, signedIn: !!R.me, callsign: R.me && R.me.callsign } : {
@@ -814,6 +1015,7 @@ function feedBoard() {
     roster: R.roster.map((p) => ({ id: p.id, conn: p.conn, callsign: p.callsign, rank: p.rank, squadLeader: p.squadLeader, staff: p.staff,
       voice: p.voice, ftl: p.ftl, nets: p.nets, monitor: p.monitor, talking: p.talking })),
     seats: R.seats,
+    direct: { can: canTalkNet("direct"), pick: R.directPick, to: directTarget(), incoming: [...R.incoming.values()], tx: R.tx === "direct" ? R.txTo : null, key: keyLabel(S("direct").key) },
   };
   try { boardChan.postMessage({ t: "state", state: st }); } catch {}
 }

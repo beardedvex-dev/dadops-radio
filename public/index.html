@@ -64,6 +64,7 @@
         <div class="headbtns">
           <button class="ghost small" id="board-open" title="Tonight's op, the squad board, timers and your notes">Battle Board</button>
           <button class="ghost small" id="offnet" title="Leave every net but keep the app and the Battle Board open">Go off net</button>
+          <button class="ghost small" id="nets-open" title="Add, change or remove nets (BeardedVeX and S3 - Core)" hidden>Nets</button>
         </div>
       </div>
     </div>
@@ -74,6 +75,7 @@
     <div id="fireteams" class="fireteams" hidden></div>
     <div class="label pad nets-head"><span>YOUR NETS</span><span class="klbl" id="kit-discord"></span></div>
     <div id="nets" class="nets"></div>
+    <div class="nets dl-wrap"><div id="direct" class="net direct joined open" hidden></div></div>
     <details id="micbox" class="box desk mic" hidden>
       <summary class="label">MIC CHECK</summary>
       <label class="miclbl" for="mic-pick">Microphone</label>
@@ -108,6 +110,18 @@
         <label class="vol">Size <input type="range" id="ovl-size" min="70" max="160" step="10" aria-label="Overlay size"> <span id="ovl-size-val">100%</span></label>
         <label class="vol">See-through <input type="range" id="ovl-see" min="0" max="60" step="5" aria-label="How see-through the overlay is"> <span id="ovl-see-val">0%</span></label>
       </div>
+      <div class="ovl" id="duck-row" hidden>
+        <div class="opt ovl-top">
+          <label for="duck-mode">Turn Discord down</label>
+          <select id="duck-mode">
+            <option value="off">Never</option>
+            <option value="others">While someone talks to me on Dad Net</option>
+            <option value="anyone">While anyone talks on Dad Net (me too)</option>
+          </select>
+        </div>
+        <label class="vol">Discord drops to <input type="range" id="duck-level" min="0" max="90" step="10" aria-label="How loud Discord stays while the radio talks"> <span id="duck-level-val">30%</span></label>
+        <div class="update-line"><span class="muted" id="duck-state"></span><button class="ghost small" id="duck-test">Test it</button></div>
+      </div>
       <div class="update-line" id="upd-line" hidden><span class="muted" id="upd-state"></span><button class="ghost small" id="upd-check">Check for updates</button></div>
       <div id="update" class="update" hidden><span id="update-text"></span><button id="update-now" class="join">Restart now</button></div>
       <p class="muted">Closing this window keeps the radio running in the tray (bottom right, by the clock). Right-click the DAD Ops patch there to quit or go off net.</p>
@@ -128,6 +142,13 @@
     <h1 class="title">OFF NET</h1>
     <p class="lead">You're off every net. Nobody hears you and you won't hear the radio. The Battle Board and your notes still work.</p>
     <button id="backon" class="primary wide">Get back on net</button>
+  </section>
+
+  <!-- 5. The Nets screen (BeardedVeX and S3 - Core) -->
+  <section id="v-nets" class="view" hidden>
+    <div class="head"><div class="grow"><div class="label">DAD NET</div><div class="tonight">THE NETS</div></div>
+      <button class="ghost small" id="nets-back">Back to the radio</button></div>
+    <div id="nets-screen" class="nets-screen"></div>
   </section>
 
   <section id="v-denied" class="view center" hidden>

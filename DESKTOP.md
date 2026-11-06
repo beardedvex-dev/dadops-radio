@@ -136,6 +136,32 @@ Open **Desktop app** at the bottom of the radio:
 - **Size:** 70% to 160%. **See-through:** 0% to 60%.
 All of it is remembered.
 
+## The direct line (from v0.6.0)
+
+Talk to just one person, wherever they are on Dad Net.
+- **Pick who:** click their name on any net or on the Battle Board, pick them
+  in the **Calling** list on the Direct line card, or press your **Next** key
+  in-game to step through people (people on your nets first). The overlay
+  shows **📞 name** so you know who you'll get.
+- **Talk:** hold your **Direct** key. Set both keys on the Direct line card
+  (they start unset in the app; K and L in a browser).
+- **Reply:** with nobody picked, the Direct key answers whoever called you last.
+
+## Turn Discord down (from v0.6.0)
+
+Open **Desktop app** at the bottom of the radio:
+- **Turn Discord down:** Never, **While someone talks to me on Dad Net**, or
+  **While anyone talks on Dad Net (me too)**.
+- **Discord drops to:** 0% (muted) to 90% of where your Discord slider was.
+- **Test it** turns Discord down for 2 seconds and back. Start a call or play
+  something in Discord first, or there's nothing to turn down.
+
+It moves Discord's slider in the Windows **Volume Mixer** (right-click the
+speaker by the clock → Volume mixer) and puts it back exactly where it was,
+even if Dad Net closes in the middle. It uses a small PowerShell helper, so
+the first time it can take a second or two. If an antivirus asks about
+PowerShell from Dad Net, that's this.
+
 ## Updating
 
 The app checks for updates when it starts and every 6 hours. When a new

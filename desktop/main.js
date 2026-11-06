@@ -21,6 +21,7 @@ const { app, BaseWindow, BrowserWindow, WebContentsView, Tray, Menu, ipcMain, se
 const path = require("path");
 const fs = require("fs");
 const { keyFromHook, buttonFromHook } = require("./keys");
+const { Ducker } = require("./duck");
 
 const CONFIG = JSON.parse(fs.readFileSync(path.join(__dirname, "config.json"), "utf8"));
 const RADIO_URL = (process.env.DADOPS_RADIO_URL || CONFIG.radioUrl).replace(/\/+$/, "");
@@ -47,13 +48,15 @@ if (!app.requestSingleInstanceLock()) { app.quit(); }
 // ---------- saved settings ----------
 const PREFS_FILE = () => path.join(app.getPath("userData"), "prefs.json");
 let prefs = { overlay: true, startWithWindows: false, pdaKey: { code: "F9" }, unfolded: false, openWidth: 1560, kitBounds: null,
-  overlayCorner: "tl", overlayX: null, overlayY: null, overlayScale: 1, overlayOpacity: 1 };
+  overlayCorner: "tl", overlayX: null, overlayY: null, overlayScale: 1, overlayOpacity: 1,
+  duckMode: "others", duckLevel: 30 }; // Turn Discord down: off / others (talking to you) / anyone (you too); level 0 = mute
 function loadPrefs() { try { prefs = { ...prefs, ...JSON.parse(fs.readFileSync(PREFS_FILE(), "utf8")) }; } catch {} }
 function savePrefs() { try { fs.writeFileSync(PREFS_FILE(), JSON.stringify(prefs, null, 2)); } catch {} }
 
 let updState = "", checkNow = null;
 let hookState = "starting", hookLast = 0; // the in-game key listener: starting / running / failed
 let kit = null, shellView = null, radioView = null, pdaView = null, overlay = null, tray = null;
+let ducker = null;
 let quitting = false, lastOverlay = null, update = null, capturingPda = false, unfolded = false, overGame = false, ovMoving = false;
 
 // ---------- the field kit window ----------
@@ -304,6 +307,7 @@ function netCmd(c) { if (radioView) radioView.webContents.send("dadops:netcmd", 
 function publicPrefs() {
   return { overlay: prefs.overlay, startWithWindows: prefs.startWithWindows, pdaKey: prefs.pdaKey, capturingPda, unfolded,
     overlayCorner: prefs.overlayCorner, overlayScale: prefs.overlayScale, overlayOpacity: prefs.overlayOpacity, overlayMoving: ovMoving,
+    duckMode: prefs.duckMode, duckLevel: prefs.duckLevel, duckStatus: ducker ? ducker.status : "", duckAvailable: !!(ducker && ducker.available()),
     version: app.getVersion(), update, updState, canCheck: !!checkNow, hookState, hookLast };
 }
 function keyName(k) {
@@ -350,6 +354,7 @@ function startHook() {
     global.__ovl = () => ({ bounds: overlay.getBounds(), opacity: overlay.getOpacity(), zoom: overlay.webContents.getZoomFactor(), moving: ovMoving, visible: overlay.isVisible(), focusable: overlay.isFocusable() });
     global.__ovlDrag = (x, y) => { overlay.setPosition(x, y); overlay.emit("moved"); };
     global.__netCmd = netCmd;
+    global.__duck = () => ({ status: ducker.status, ducked: ducker.ducked, level: ducker.level });
     global.__trayLabels = () => tray.labels();
     global.__trayClick = (label) => { const it = tray.items().find((i) => i.label === label); if (it) it.click(it); return !!it; };
   }
@@ -405,9 +410,14 @@ ipcMain.handle("dadops:prefs:set", (e, p) => {
   if (!fromRadio(e) || !p || typeof p !== "object") return null;
   if ("overlay" in p) prefs.overlay = !!p.overlay;
   if ("startWithWindows" in p) { prefs.startWithWindows = !!p.startWithWindows; applyStartWithWindows(); }
+  if (["off", "others", "anyone"].includes(p.duckMode)) { prefs.duckMode = p.duckMode; if (p.duckMode === "off" && ducker) ducker.set(false); }
+  if (Number.isFinite(p.duckLevel)) { prefs.duckLevel = Math.max(0, Math.min(90, Math.round(p.duckLevel))); if (ducker && ducker.ducked) ducker.set(true, prefs.duckLevel); }
   savePrefs(); showOverlay(); sendPrefs();
   return publicPrefs();
 });
+// Turn Discord down while the radio talks (the page says when).
+ipcMain.on("dadops:duck", (e, on) => { if (fromRadio(e) && ducker) ducker.set(!!on && prefs.duckMode !== "off", prefs.duckLevel); });
+ipcMain.handle("dadops:duck-test", async (e) => { if (!fromRadio(e) || !ducker) return null; const r = await ducker.test(prefs.duckLevel); sendPrefs(); return r; });
 ipcMain.on("dadops:install-update", (e) => { if (fromRadio(e) && update) installUpdate(); });
 ipcMain.on("dadops:check-updates", (e) => { if (fromRadio(e) && checkNow) checkNow(); });
 ipcMain.on("dadops:pda", (e, show) => { if (fromRadio(e)) setUnfolded(show === undefined ? !unfolded : !!show); });
@@ -423,11 +433,12 @@ ipcMain.on("kit:cmd", (e, cmd) => {
 });
 
 app.on("second-instance", () => { if (kit) showKit({}); });
-app.on("before-quit", () => { quitting = true; });
+app.on("before-quit", () => { quitting = true; if (ducker) ducker.stop(); }); // Discord goes back to where it was
 app.on("window-all-closed", (e) => e.preventDefault());
 
 app.whenReady().then(() => {
   loadPrefs();
+  ducker = new Ducker({ dir: app.getPath("userData"), source: path.join(__dirname, "duck.ps1"), onStatus: () => sendPrefs() });
   // The microphone, for the radio page only.
   session.defaultSession.setPermissionRequestHandler((wc, perm, cb, details) => {
     const origin = (() => { try { return new URL(details.requestingUrl || wc.getURL()).origin; } catch { return ""; } })();

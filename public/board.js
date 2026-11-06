@@ -79,7 +79,7 @@ const netBadges = (p) => (p.nets || []).filter((n) => n !== "allcall").map((n) =
   const mon = (p.monitor || []).includes(n);
   return `<span class="nb ${p.talking === n ? "live" : ""} ${mon ? "mon" : ""}" title="${esc(net.name || n)}${mon ? " (listening)" : ""}">${esc(net.short || n)}</span>`;
 }).join("");
-const person = (p) => `<li class="${p.talking ? "live" : ""}${p.conn === S.conn ? " me" : ""}"><span class="cs">${esc(p.callsign)}${p.conn === S.conn ? " (you)" : ""}</span>` +
+const person = (p) => `<li class="${p.talking ? "live" : ""}${p.conn === S.conn ? " me" : ""}${S.direct && S.direct.pick === p.conn ? " picked" : ""}"${p.conn !== S.conn && S.direct && S.direct.can ? ` data-pick="${esc(p.conn)}" title="Pick ${esc(p.callsign)} for your direct line"` : ""}><span class="cs">${S.direct && S.direct.pick === p.conn ? "📞 " : ""}${esc(p.callsign)}${p.conn === S.conn ? " (you)" : ""}</span>` +
   `${p.rank && RANKS[p.rank] ? `<span class="rk">${RANKS[p.rank]}</span>` : ""}<span class="grow"></span>${netBadges(p)}${p.talking ? '<span class="tx">TALKING</span>' : ""}</li>`;
 
 function squad(on) {
@@ -113,8 +113,19 @@ function comms(on) {
     const mode = S.tx === k ? '<span class="tx">YOU</span>' : mon || !n.key ? '<span class="mode">LISTEN</span>' : n.key === "no key" ? '<span class="mode">NO KEY SET</span>' : `<span class="kk">${esc(n.key)}</span>`;
     return `<tr class="${talker ? "live" : ""}"><th>${esc(n.name)}</th><td>${count} on</td><td class="who">${talker ? esc(talker.callsign) : ""}</td><td class="r">${mode}</td></tr>`;
   }).join("");
-  $("comms").innerHTML = rows ? `<table><tbody>${rows}</tbody></table>` : '<p class="muted">You\'re not on any nets yet.</p>';
+  const d = S.direct || {};
+  const who = (c) => (S.roster.find((p) => p.conn === c) || {}).callsign || "";
+  const dl = d.tx ? `<tr class="live"><th>Direct</th><td></td><td class="who">${esc(who(d.tx))}</td><td class="r"><span class="tx">YOU</span></td></tr>`
+    : (d.incoming || []).length ? `<tr class="live"><th>Direct</th><td></td><td class="who">${esc(d.incoming.join(", "))}</td><td class="r"><span class="mode">TO YOU</span></td></tr>`
+    : d.can ? `<tr><th>Direct</th><td>${d.to ? esc(who(d.to)) : "nobody picked"}</td><td class="who"></td><td class="r">${d.key && d.key !== "None" ? `<span class="kk">${esc(d.key)}</span>` : '<span class="mode">NO KEY SET</span>'}</td></tr>` : "";
+  $("comms").innerHTML = rows || dl ? `<table><tbody>${rows}${dl}</tbody></table>${d.can ? '<p class="muted pickhint">Click a name on the squad board to pick them for your direct line.</p>' : ""}` : '<p class="muted">You\'re not on any nets yet.</p>';
 }
+
+// A name clicked on the squad board: the radio picks them for the direct line.
+document.addEventListener("click", (e) => {
+  const li = e.target.closest("[data-pick]");
+  if (li && chan) { chan.postMessage({ t: "pick", conn: li.dataset.pick }); }
+});
 
 // ---------- clocks and timers ----------
 let sw = { run: false, from: 0, acc: 0 };

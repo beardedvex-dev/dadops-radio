@@ -1,7 +1,7 @@
 {
   "name": "dadops-radio-desktop",
   "productName": "DAD Ops Radio",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "Dad Net for Windows: talk keys that work in-game, the overlay and the Battle Board",
   "author": "DAD Ops",
   "private": true,
@@ -33,7 +33,9 @@
       "shell.html",
       "shell.js",
       "shell-preload.js",
-      "build/icon.png"
+      "build/icon.png",
+      "duck.js",
+      "duck.ps1"
     ],
     "directories": {
       "buildResources": "build",

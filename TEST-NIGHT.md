@@ -56,6 +56,15 @@ Tick each one, and note anything odd.
       **Voice: backup route (relay)**. Note who's on the backup route and what
       network they're on. Both should sound the same.
 
+**Direct line**
+- [ ] Click someone's name on a net, hold the Direct key: only they hear you
+- [ ] They hold their Direct key without picking anyone: it answers you
+- [ ] The Next key steps through people; the overlay shows 📞 and the name
+
+**Turn Discord down (app)**
+- [ ] With Discord in a call, someone talks on Dad Net: Discord drops, then comes back
+- [ ] Try muted and 30%. Which do the leads like?
+
 **Staying on**
 - [ ] Leave the tab open for 30+ minutes. Still On net, still works?
 - [ ] Turn Wi-Fi off and on again on one device. Does it come back by itself?
