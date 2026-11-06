@@ -18,7 +18,10 @@
 //                                which Discord voice channel each person is in
 //    DISCORD_RALLY_POINT_ID      (secret, optional) The Rally Point's channel ID
 //                                (how the radio finds the DAD Ops server)
-//    SFU_BASE, DISCORD_API       optional, only changed for local tests
+//    TURN_KEY_ID                 (secret, optional) a TURN key from Cloudflare >
+//    TURN_KEY_API_TOKEN          Realtime > TURN Server: the backup route for
+//                                networks that block voice (see SETUP.md)
+//    SFU_BASE, DISCORD_API, TURN_BASE  optional, only changed for local tests
 // =====================================================================
 
 // The nets, in the order they show. To add one: copy a line, give it a new
@@ -342,6 +345,32 @@ export class Radio {
     }));
   }
 
+  // Short-lived TURN logins, shared by everyone, made fresh every 12 hours
+  // (each is good for 24). The TURN key itself never leaves Cloudflare.
+  async iceServers() {
+    const stun = [{ urls: ["stun:stun.cloudflare.com:3478"] }];
+    if (!this.env.TURN_KEY_ID || !this.env.TURN_KEY_API_TOKEN) return stun;
+    if (this.ice && Date.now() - this.ice.at < 12 * 3600e3) return this.ice.list;
+    try {
+      const base = (this.env.TURN_BASE || "https://rtc.live.cloudflare.com/v1").replace(/\/+$/, "");
+      const r = await fetch(`${base}/turn/keys/${encodeURIComponent(this.env.TURN_KEY_ID)}/credentials/generate-ice-servers`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${this.env.TURN_KEY_API_TOKEN}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ ttl: 86400 }),
+      });
+      if (!r.ok) return stun;
+      const j = await r.json();
+      // Browsers block port 53, so those addresses would only time out.
+      const list = (j.iceServers || []).map((s) => {
+        const urls = (Array.isArray(s.urls) ? s.urls : [s.urls]).filter((u) => typeof u === "string" && !/:53(\?|$)/.test(u));
+        return urls.length ? { ...s, urls } : null;
+      }).filter(Boolean);
+      if (!list.length) return stun;
+      this.ice = { at: Date.now(), list };
+      return list;
+    } catch { return stun; }
+  }
+
   send(ws, msg) { try { ws.send(JSON.stringify(msg)); } catch {} }
   broadcast(msg) { const s = JSON.stringify(msg); for (const { ws } of this.members()) { try { ws.send(s); } catch {} } }
   pushRoster() { this.broadcast({ t: "roster", members: this.roster(), seats: this.seatsView() }); }
@@ -439,6 +468,10 @@ export class Radio {
         this.pushRoster();
         return;
       }
+
+      // How to connect: STUN always, plus Cloudflare's TURN relay (the backup
+      // route through networks that block voice) when a TURN key is set.
+      if (msg.t === "ice") return reply({ t: "ice", iceServers: await this.iceServers() });
 
       if (msg.t === "session") {
         if (a.sessionId) return reply({ t: "session", sessionId: a.sessionId });

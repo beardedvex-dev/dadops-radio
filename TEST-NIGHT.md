@@ -51,6 +51,11 @@ Tick each one, and note anything odd.
 - [ ] Two people join Recon (then Air Support, then Logistics); each plays in the **right ear** and doesn't
       show up on Command
 
+**Networks**
+- [ ] Everyone checks the line under their name: **Voice: direct** or
+      **Voice: backup route (relay)**. Note who's on the backup route and what
+      network they're on. Both should sound the same.
+
 **Staying on**
 - [ ] Leave the tab open for 30+ minutes. Still On net, still works?
 - [ ] Turn Wi-Fi off and on again on one device. Does it come back by itself?

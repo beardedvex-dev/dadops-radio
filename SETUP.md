@@ -139,6 +139,45 @@ Channels named like "Fireteam 2" show as **FT2**; others show their name.
 
 The token is a password: never post it in Discord or chat.
 
+## Optional but recommended: the backup route (5 min)
+
+Some networks (work, hotels, some phone data, strict home routers) block the
+normal way voice travels. On those, Dad Net says **On net** but nobody hears
+you and you hear nobody. The backup route sends the voice through
+Cloudflare's relay (called **TURN**) instead, only for the people who need it.
+It shares the same free 1,000 GB a month as the voice relay, and isn't
+charged twice.
+
+**1. Make a TURN key**
+- Cloudflare dashboard → **Realtime** (in the left menu, where you made the
+  voice relay in step 2) → **TURN Server** → **Create** (or **Create TURN
+  key**). Name it `dadnet`.
+- It shows a **Turn Token ID** and an **API Token**. Copy both somewhere
+  safe for a minute. The API Token is a password: it's only shown once.
+
+**2. Add both to the radio** (Workers & Pages → **dadops-radio** → Settings →
+Variables and Secrets → Add, type **Secret** for both):
+
+| Name | Value |
+|---|---|
+| `TURN_KEY_ID` | the Turn Token ID |
+| `TURN_KEY_API_TOKEN` | the API Token |
+
+Click **Deploy**.
+
+**3. Check it**
+- Open the radio in a browser with `?relay=1` on the end of the address,
+  like `https://dadops-radio.beardedvex.workers.dev/?relay=1`. That forces
+  the backup route. Get on net.
+- Under your name it should say **Voice: backup route (relay)**. Join Recon
+  on your phone too and talk: you should hear it.
+- Without `?relay=1` it normally says **Voice: direct**. Anyone whose
+  network blocks voice gets the backup route by themselves.
+
+Without these two secrets everything works as before, just without the
+backup route. The radio never shows the key to anyone; it hands out
+short-lived logins that expire after a day.
+
 ## Who gets what
 
 | Who | Hears | Can talk on |

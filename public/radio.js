@@ -237,8 +237,42 @@ async function radioCheck() {
 // Every change to the connection runs one at a time.
 const serial = (fn) => (R.chain = R.chain.then(fn, fn));
 
+// The backup route: Cloudflare's TURN relay carries the voice for anyone whose
+// network blocks the normal way (some work, hotel and phone networks).
+// ?relay=1 forces it, to test that it works.
+const RELAY_ONLY = /[?&]relay=1\b/.test(location.search);
+async function iceServers() {
+  const stun = [{ urls: "stun:stun.cloudflare.com:3478" }];
+  try {
+    const r = await Promise.race([ask({ t: "ice" }), new Promise((ok) => setTimeout(() => ok(null), 5000))]);
+    return r && r.t === "ice" && Array.isArray(r.iceServers) && r.iceServers.length ? r.iceServers : stun;
+  } catch { return stun; }
+}
+// Which way the voice is going: straight to Cloudflare, or through the relay.
+async function showRoute() {
+  const el = $("route"); if (!el || !R.pc) return;
+  try {
+    const stats = await R.pc.getStats();
+    let pair = null;
+    stats.forEach((s) => { if (s.type === "transport" && s.selectedCandidatePairId) pair = stats.get(s.selectedCandidatePairId); });
+    if (!pair) stats.forEach((s) => { if (!pair && s.type === "candidate-pair" && s.nominated && s.state === "succeeded") pair = s; });
+    const local = pair && stats.get(pair.localCandidateId);
+    if (!local) return;
+    R.route = local.candidateType === "relay" ? "relay" : "direct";
+    el.textContent = R.route === "relay" ? "Voice: backup route (relay)" : "Voice: direct";
+    el.title = R.route === "relay" ? "Your network blocks the normal way, so your voice goes through Cloudflare's relay. Works the same." : "Your voice goes straight to Cloudflare.";
+  } catch {}
+}
+
 async function startVoice() {
-  R.pc = new RTCPeerConnection({ iceServers: [{ urls: "stun:stun.cloudflare.com:3478" }], bundlePolicy: "max-bundle" });
+  const ice = await iceServers();
+  R.pc = new RTCPeerConnection({ iceServers: ice, bundlePolicy: "max-bundle", iceTransportPolicy: RELAY_ONLY ? "relay" : "all" });
+  R.pc.onconnectionstatechange = () => {
+    const st = R.pc && R.pc.connectionState;
+    if (st === "connected") setTimeout(showRoute, 300);
+    // Voice gave out (network changed, Wi-Fi dropped): start over, the same as a lost net.
+    if (st === "failed" && !R.stopping && R.ws) { flash("Lost the voice connection. Getting back on net..."); try { R.ws.close(); } catch {} }
+  };
   R.pc.ontrack = (e) => {
     const conn = R.midToConn.get(e.transceiver.mid);
     if (conn) addPipe(conn, e.track);

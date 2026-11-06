@@ -80,4 +80,6 @@ phase 2.
 
 Secrets (in Cloudflare only, never in this repo): `REALTIME_APP_ID`,
 `REALTIME_APP_SECRET`, and optionally `DISCORD_BOT_TOKEN` + `DISCORD_RALLY_POINT_ID`
-(shows each person's Discord voice channel; see SETUP.md).
+(shows each person's Discord voice channel; see SETUP.md) and `TURN_KEY_ID` +
+`TURN_KEY_API_TOKEN` (the backup route through Cloudflare's TURN relay for
+networks that block voice; `?relay=1` on the radio's address forces it to test).

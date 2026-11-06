@@ -195,3 +195,5 @@ body.kit .headbtns{margin-top:2px}
 .ovl select{min-height:30px;background:#15140F;color:var(--cream);border:1px solid var(--line2);border-radius:6px;padding:0 6px;font:inherit;font-size:13px}
 #ovl-move.wait{border-color:var(--tan);color:var(--tan);border-style:dashed}
 body.kit .head{flex-wrap:wrap}
+.route{font-size:12px;margin-top:2px}
+body.kit #route{font:500 10px "IBM Plex Mono",monospace;letter-spacing:.08em;text-transform:uppercase;color:#8f8770}
