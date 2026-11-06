@@ -139,6 +139,15 @@ Channels named like "Fireteam 2" show as **FT2**; others show their name.
 
 The token is a password: never post it in Discord or chat.
 
+## Optional: Dad Net on dadops.gg and in Horton's posts (10 min)
+
+Dad Net can tell the website who's on Command and which teams have an FTL,
+so it shows on the /fireteams lineup card, the muster board and the op on
+dadops.gg. The steps are in **DAD-NET.md in the website repo**. In short:
+the same long random key goes in two places, `DADNET_KEY` in Vercel
+(dadops.gg) and `DADNET_KEY` as a **Secret** here (Workers & Pages →
+dadops-radio → Settings → Variables and Secrets).
+
 ## Optional but recommended: the backup route (5 min)
 
 Some networks (work, hotels, some phone data, strict home routers) block the

@@ -98,7 +98,27 @@ async function connect() {
   R.ws.onclose = onClosed;
   await new Promise((ok, fail) => { R.ws.onopen = ok; R.ws.onerror = () => fail(new Error("Couldn't reach the radio. Try again.")); });
   const w = await ask({ t: "hello", token: R.token });
-  if (w.t === "denied") { $("denied-why").textContent = w.reason; R.stopping = true; return show("v-denied"); }
+  if (w.t === "denied") {
+    if (R.ws) R.ws.onclose = null; // the switchboard hangs up now: don't treat that as a lost net
+    // An old or ended sign-in (signing out on dadops.gg ends this one too):
+    // try a fresh one quietly, else sign in again right here, not in a browser.
+    if (w.signIn || /sign in again/i.test(w.reason || "")) {
+      if (!R.refreshed) {
+        R.refreshed = true;
+        const r = await R.sb.auth.refreshSession().catch(() => null);
+        if (r && r.data && r.data.session) { R.token = r.data.session.access_token; return connect(); }
+      }
+      R.refreshed = false; R.stopping = true;
+      await R.sb.auth.signOut({ scope: "local" }).catch(() => {});
+      $("signout").hidden = true;
+      $("signin-why").textContent = "Your sign-in ran out (signing out on dadops.gg signs you out here too). Sign in with Discord again.";
+      $("signin-why").hidden = false;
+      $("goonnet").disabled = false;
+      return show("v-signin");
+    }
+    $("denied-why").textContent = w.reason; R.stopping = true; return show("v-denied");
+  }
+  R.refreshed = false;
   if (w.t !== "welcome") throw new Error(w.reason || "Couldn't get on net.");
   R.me = w.me; R.can = w.can; R.conn = w.conn; R.nets = w.nets; R.roster = w.roster; R.seats = w.seats || []; R.retry = 0;
   buildNets();

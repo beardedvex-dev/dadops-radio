@@ -21,6 +21,10 @@
 //    TURN_KEY_ID                 (secret, optional) a TURN key from Cloudflare >
 //    TURN_KEY_API_TOKEN          Realtime > TURN Server: the backup route for
 //                                networks that block voice (see SETUP.md)
+//    DADNET_KEY                  (secret, optional) shared with dadops.gg (Vercel), so
+//                                Dad Net can tell the website who's on Command and
+//                                which teams have an FTL (Horton's posts, the op card)
+//    DADNET_REPORT_URL           optional, defaults to https://dadops.gg/api/discord-sync
 //    SFU_BASE, DISCORD_API, TURN_BASE  optional, only changed for local tests
 // =====================================================================
 
@@ -66,14 +70,14 @@ export default {
 //  Who are you? Checks the dadops.gg sign-in and works out what you can do.
 // ---------------------------------------------------------------------
 export async function whoIs(env, token, now = Date.now()) {
-  if (typeof token !== "string" || token.length < 20 || token.length > 4096) return { error: "Sign in again." };
+  if (typeof token !== "string" || token.length < 20 || token.length > 4096) return { error: "Sign in again.", signIn: true };
   const base = String(env.SUPABASE_URL || "").replace(/\/+$/, "");
   const h = { apikey: env.SUPABASE_KEY, Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
 
   const ures = await fetch(`${base}/auth/v1/user`, { headers: h });
-  if (!ures.ok) return { error: "Your sign-in has expired. Sign in again." };
+  if (!ures.ok) return { error: "Your sign-in has expired. Sign in again.", signIn: true };
   const user = await ures.json();
-  if (!user || !user.id) return { error: "Sign in again." };
+  if (!user || !user.id) return { error: "Sign in again.", signIn: true };
 
   // The same check the website's Private-only pages use.
   const mres = await fetch(`${base}/rest/v1/rpc/member_pages_me`, { method: "POST", headers: h, body: "{}" });
@@ -180,6 +184,7 @@ export class Radio {
       if (a.state === "hello" && Date.now() - (a.at || 0) > 15000) { try { ws.close(4001, "Sign in took too long"); } catch {} }
     }
     await this.voiceTick();
+    await this.flushReport().catch(() => {});
     // Keep ticking while anyone is connected (sign-in timeouts + Discord channels).
     if (this.ctx.getWebSockets().length) await this.ctx.storage.setAlarm(Date.now() + 15000);
   }
@@ -373,7 +378,52 @@ export class Radio {
 
   send(ws, msg) { try { ws.send(JSON.stringify(msg)); } catch {} }
   broadcast(msg) { const s = JSON.stringify(msg); for (const { ws } of this.members()) { try { ws.send(s); } catch {} } }
-  pushRoster() { this.broadcast({ t: "roster", members: this.roster(), seats: this.seatsView() }); }
+  pushRoster() { this.broadcast({ t: "roster", members: this.roster(), seats: this.seatsView() }); this.noteChange(); }
+
+  // ---------- telling dadops.gg (Horton's posts and the op card) ----------
+  // Who's on Command (talking, not just listening) with their seat or role,
+  // and each team's FTL. Callsigns only: no Discord IDs, nothing anyone said.
+  reportState() {
+    const ms = this.members();
+    const tagOf = (ch) => voiceTag(this.chanNames && this.chanNames.get(ch));
+    const people = new Map(), listening = new Set(), onNet = new Set();
+    for (const { a } of ms) {
+      onNet.add(a.me.id);
+      if (!(a.nets || []).includes("command")) continue;
+      if ((a.monitor || []).includes("command")) { listening.add(a.me.id); continue; }
+      const seat = this.seatOf(a.me.id);
+      const role = seat ? `${tagOf(seat)} FTL` : a.me.squadLeader ? "SL" : a.me.staff ? "S3" : rankAtLeast(a.me.rank, "sgt") ? "Sgt+" : null;
+      people.set(a.me.id, { id: a.me.id, callsign: a.me.callsign, role });
+    }
+    for (const id of people.keys()) listening.delete(id);
+    const order = (p) => (p.role === "SL" ? 0 : /FTL$/.test(p.role || "") ? 1 : p.role === "S3" ? 2 : 3);
+    const command = [...people.values()].sort((x, y) => order(x) - order(y) || String(x.role || "").localeCompare(String(y.role || ""), "en", { numeric: true }) || x.callsign.localeCompare(y.callsign));
+    const seats = this.seatsView().map((v) => ({ tag: v.tag, name: v.name, ftl: v.holder ? v.holder.callsign : null, away: !!(v.holder && v.holder.away), count: v.count }));
+    return { on_net: onNet.size, listening: listening.size, command, seats };
+  }
+  noteChange() { this.reportDirty = true; this.ctx.waitUntil(this.flushReport().catch(() => {})); }
+  // Sent when something changed (at most every 5 seconds) and every 4 minutes
+  // while anyone's on, so the website knows the picture is still current.
+  async flushReport() {
+    if (!this.env.DADNET_KEY) return;
+    const now = Date.now(), since = now - (this.lastReportAt || 0);
+    if (!this.reportDirty && since < 240e3) return;
+    if (since < 5000) { // too soon: the next alarm sends it
+      const at = await this.ctx.storage.getAlarm();
+      if (!at || at > now + 6000) await this.ctx.storage.setAlarm(now + 6000);
+      return;
+    }
+    const body = JSON.stringify({ dadnet: this.reportState() });
+    this.reportDirty = false;
+    if (body === this.lastReportBody && since < 240e3) return;
+    this.lastReportAt = now;
+    const url = this.env.DADNET_REPORT_URL || "https://dadops.gg/api/discord-sync";
+    try {
+      const r = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json", "x-dadnet-key": this.env.DADNET_KEY, "User-Agent": "Dad Net (dadops.gg, 1.0)" }, body });
+      if (r.ok) this.lastReportBody = body;
+      else if (r.status !== 401 && r.status !== 403) this.reportDirty = true; // a wrong key waits for the 4-minute try
+    } catch { this.reportDirty = true; }
+  }
 
   sfu(path, method, body) {
     const base = (this.env.SFU_BASE || "https://rtc.live.cloudflare.com/v1").replace(/\/+$/, "");
@@ -395,7 +445,7 @@ export class Radio {
       if (msg.t === "hello") {
         if (a.state !== "hello") return;
         const me = await whoIs(this.env, msg.token);
-        if (me.error) { reply({ t: "denied", reason: me.error }); try { ws.close(4003, "Not allowed"); } catch {} return; }
+        if (me.error) { reply({ t: "denied", reason: me.error, signIn: !!me.signIn }); try { ws.close(4003, "Not allowed"); } catch {} return; }
         const can = rights(me);
         const conn = crypto.randomUUID().slice(0, 8);
         // Everyone hears All-call. Command and Air are opt-in.
