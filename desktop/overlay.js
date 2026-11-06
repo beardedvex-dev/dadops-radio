@@ -4,10 +4,22 @@
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 const BARS = '<span class="bars" aria-hidden="true"><i></i><i></i><i></i><i></i></span>';
 
+let last = null, mode = { anchor: { h: "left", v: "top" }, moving: false };
+
 function draw(s) {
+  if (s !== undefined) last = s;
+  s = last;
   const wrap = document.getElementById("wrap");
+  document.body.className = `h-${mode.anchor.h} v-${mode.anchor.v}${mode.moving ? " moving" : ""}`;
+  const mover = document.getElementById("mover");
+  mover.hidden = !mode.moving;
+  if (mode.moving && (!s || !s.on || !(s.nets || []).some((n) => n.talker || n.you))) { // show a sample so you can see the size
+    wrap.innerHTML = '<div class="head"><img src="build/icon.png" alt=""><span>DAD NET</span></div>' +
+      '<div class="row live"><span class="tag">CMD</span>' + BARS + '<span class="who">Sample · FT1 FTL</span></div>';
+    return;
+  }
   if (!s || !s.on) { wrap.innerHTML = ""; return; }
-  const head = '<div class="head"><img src="build/icon.png" alt=""><span>DAD OPS RADIO</span></div>';
+  const head = '<div class="head"><img src="build/icon.png" alt=""><span>DAD NET</span></div>';
   if (s.status && s.status !== "On net") {
     wrap.innerHTML = head + `<div class="row down"><span class="tag">RADIO</span><span>${esc(s.status)}...</span></div>`;
     return;
@@ -24,3 +36,5 @@ function draw(s) {
 }
 
 window.overlayBridge.onState(draw);
+if (window.overlayBridge.onMode) window.overlayBridge.onMode((m) => { mode = { ...mode, ...m }; draw(); });
+document.getElementById("done").onclick = () => window.overlayBridge.done();

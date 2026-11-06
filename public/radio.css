@@ -166,3 +166,32 @@ body.kit #flash{margin:0 0 8px}
 .mic-meter span.hot{background:var(--red)!important}
 #mic-check:disabled{opacity:.6;cursor:default}
 body.kit .mic{margin-top:10px}
+/* v0.5: header buttons, fireteams + FTL seats, overlay spot */
+.headside{display:flex;flex-direction:column;align-items:flex-end;gap:8px}
+.headbtns{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+body.kit #board-open{display:none}
+.fireteams{display:flex;flex-direction:column;gap:6px;padding:0 20px}
+.fireteams .nets-head{padding-left:0;padding-right:0}
+.ft{display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--panel);border:1px solid var(--line);border-radius:8px;flex-wrap:wrap}
+.ft.here{border-color:var(--olive)}
+.ft.mine{border-color:var(--tan-dark);background:#211d13}
+.ft.live{border-color:var(--tan)}
+.fttag{font:800 15px "Big Shoulders Display",sans-serif;letter-spacing:.1em;color:var(--tan);min-width:38px}
+.ftname{font-size:12px;color:var(--muted)}
+.ftl{font-size:14px}
+.ftl b{color:var(--cream)}
+.ft.mine .ftl b{color:var(--tan)}
+.ftpick{min-height:30px;background:#15140F;color:var(--cream);border:1px solid var(--line2);border-radius:6px;padding:0 6px;font:inherit;font-size:12px;max-width:130px}
+.ftnone{padding:2px 0 4px}
+body.kit .fireteams{padding:0}
+body.kit .ft{background:#191912;border-color:#3a3528}
+body.kit .ft.here{border-color:#4a4434}
+body.kit .ft.mine{border-color:var(--tan-dark);background:#211d13}
+body.kit .ft.live{border-color:var(--tan)}
+body.kit .ftname{font:600 10px "IBM Plex Mono",monospace;letter-spacing:.08em;text-transform:uppercase;color:#b8ae97}
+body.kit .headbtns{margin-top:2px}
+.ovl{display:flex;flex-direction:column;gap:8px;padding:8px 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+.ovl-top{flex-wrap:wrap}
+.ovl select{min-height:30px;background:#15140F;color:var(--cream);border:1px solid var(--line2);border-radius:6px;padding:0 6px;font:inherit;font-size:13px}
+#ovl-move.wait{border-color:var(--tan);color:var(--tan);border-style:dashed}
+body.kit .head{flex-wrap:wrap}

@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>DAD Ops Radio</title>
+<title>Dad Net</title>
 <meta name="robots" content="noindex">
 <link rel="icon" type="image/png" href="/patch.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -14,7 +14,7 @@
 <div class="app">
   <header class="bar">
     <img src="/patch.png" alt="" width="28" height="28">
-    <span class="brand">DAD OPS RADIO</span>
+    <span class="brand">DAD NET</span>
     <span class="grow"></span>
     <button id="signout" class="ghost small" hidden>Sign out</button>
   </header>
@@ -22,14 +22,15 @@
   <!-- 1. Signed out -->
   <section id="v-signin" class="view center" hidden>
     <img src="/patch.png" alt="DAD Ops patch: Limited Availability" class="big-patch" width="168" height="168">
-    <h1 class="title">DAD OPS RADIO</h1>
+    <h1 class="title">DAD NET</h1>
     <p class="script">Limited Availability</p>
     <p class="lead">Talk to the other fireteam leads without leaving your squad's channel.</p>
     <button id="signin" class="primary wide">Sign in with Discord</button>
     <p class="muted">Use the same Discord account you use on dadops.gg.</p>
     <div class="box who">
       <div class="label">WHO GETS WHAT</div>
-      <div class="row"><b>Private +</b><span>Command, Recon, Air Support and Logistics. Listen to All-call.</span></div>
+      <div class="row"><b>Private +</b><span>Recon, Air Support and Logistics. Listen in on Command, or take your fireteam's FTL seat to talk there. Listen to All-call.</span></div>
+      <div class="row"><b>Sgt +</b><span>Can talk on Command without a seat.</span></div>
       <div class="row"><b>Recruits</b><span>Listen to All-call. The rest opens when your Battle Buddies vouch you in.</span></div>
       <div class="row"><b>SL + S3</b><span>Can talk on All-call too.</span></div>
     </div>
@@ -47,7 +48,7 @@
   <!-- 3. On net -->
   <section id="v-net" class="view" hidden>
     <div class="kit-head">
-      <div class="kcell kbrand"><span class="ring" aria-hidden="true">DAD</span><span><b>DAD OPS</b><small class="klbl">Radio <span id="kit-ver"></span></small></span></div>
+      <div class="kcell kbrand"><span class="ring" aria-hidden="true">DAD</span><span><b>DAD NET</b><small class="klbl">DAD OPS <span id="kit-ver"></span></small></span></div>
       <div class="kcell kstat"><span class="klbl">Status</span><b id="kit-status">CONNECTING</b></div>
     </div>
     <div class="head">
@@ -56,12 +57,19 @@
         <div class="tonight" id="tonight">No op on right now</div>
         <div class="muted" id="whoami"></div>
       </div>
-      <div class="pill" id="status"><span class="dot"></span><span id="status-text">Connecting</span></div>
+      <div class="headside">
+        <div class="pill" id="status"><span class="dot"></span><span id="status-text">Connecting</span></div>
+        <div class="headbtns">
+          <button class="ghost small" id="board-open" title="Tonight's op, the squad board, timers and your notes">Battle Board</button>
+          <button class="ghost small" id="offnet" title="Leave every net but keep the app and the Battle Board open">Go off net</button>
+        </div>
+      </div>
     </div>
     <div class="notice">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 8v5M12 16.5v.5"></path></svg>
       <div id="notice-text">This is the <b>browser version</b>. Talk keys only work while this tab is in front. For keys that work in-game, use the desktop app.</div>
     </div>
+    <div id="fireteams" class="fireteams" hidden></div>
     <div class="label pad nets-head"><span>YOUR NETS</span><span class="klbl" id="kit-discord"></span></div>
     <div id="nets" class="nets"></div>
     <details id="micbox" class="box desk mic" hidden>
@@ -84,9 +92,23 @@
         <span class="muted">Show/hide key</span>
         <button class="key" id="pda-key" title="Change the Field PDA key">F9</button>
       </div>
+      <div class="ovl" id="ovl-row" hidden>
+        <div class="opt ovl-top">
+          <label for="ovl-corner">Overlay spot</label>
+          <select id="ovl-corner">
+            <option value="tl">Top left</option><option value="tr">Top right</option>
+            <option value="bl">Bottom left</option><option value="br">Bottom right</option>
+            <option value="custom" id="ovl-custom" hidden>Where I dragged it</option>
+          </select>
+          <button class="ghost small" id="ovl-move">Move it</button>
+        </div>
+        <p class="muted" id="ovl-move-help" hidden>Drag the overlay by its top bar to where you want it, then click Done moving (here or on the overlay).</p>
+        <label class="vol">Size <input type="range" id="ovl-size" min="70" max="160" step="10" aria-label="Overlay size"> <span id="ovl-size-val">100%</span></label>
+        <label class="vol">See-through <input type="range" id="ovl-see" min="0" max="60" step="5" aria-label="How see-through the overlay is"> <span id="ovl-see-val">0%</span></label>
+      </div>
       <div class="update-line" id="upd-line" hidden><span class="muted" id="upd-state"></span><button class="ghost small" id="upd-check">Check for updates</button></div>
       <div id="update" class="update" hidden><span id="update-text"></span><button id="update-now" class="join">Restart now</button></div>
-      <p class="muted">Closing this window keeps the radio running in the tray (bottom right, by the clock). Right-click the DAD Ops patch there to quit.</p>
+      <p class="muted">Closing this window keeps the radio running in the tray (bottom right, by the clock). Right-click the DAD Ops patch there to quit or go off net.</p>
     </details>
     <div class="grow"></div>
     <footer class="foot">
@@ -96,6 +118,14 @@
         <div class="meter" id="meter" aria-hidden="true"></div>
       </div>
     </footer>
+  </section>
+
+  <!-- 4. Off net on purpose: the app and the Battle Board stay open -->
+  <section id="v-off" class="view center" hidden>
+    <img src="/patch.png" alt="" class="big-patch" width="120" height="120">
+    <h1 class="title">OFF NET</h1>
+    <p class="lead">You're off every net. Nobody hears you and you won't hear the radio. The Battle Board and your notes still work.</p>
+    <button id="backon" class="primary wide">Get back on net</button>
   </section>
 
   <section id="v-denied" class="view center" hidden>

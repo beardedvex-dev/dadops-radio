@@ -1,4 +1,4 @@
-// Draws the field kit's chassis around the radio and the Field PDA.
+// Draws the field kit's chassis around the radio and the Battle Board.
 // main.js decides where everything goes and sends the boxes here.
 "use strict";
 const $ = (id) => document.getElementById(id);
@@ -35,10 +35,10 @@ function status(s) {
   if (s) st = { ...st, ...s };
   const on = /on net/i.test(st.status);
   const parts = [
-    `<span class="${on ? "on" : /reconnect|lost/i.test(st.status) ? "bad" : ""}">RADIO ${esc(String(st.status).toUpperCase())}</span>`,
-    `<span>${esc(st.line || "")}</span>`,
-    `<span>${esc(String(st.pdaKey).toUpperCase())} ${st.unfolded ? "SHOW / HIDE" : "FIELD PDA"}</span>`,
-  ].filter((p) => !/<span><\/span>/.test(p));
+    `<span class="${on ? "on" : /reconnect|lost/i.test(st.status) ? "bad" : ""}">DAD NET ${esc(String(st.status).toUpperCase())}</span>`,
+    `<span class="line">${esc(st.line || "")}</span>`,
+    `<span>${esc(String(st.pdaKey).toUpperCase())} ${st.unfolded ? "SHOW / HIDE" : "BOARD"}</span>`,
+  ].filter((p) => !/<span[^>]*><\/span>/.test(p));
   $("status").innerHTML = parts.join("<span>·</span>");
 }
 

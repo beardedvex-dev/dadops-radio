@@ -3,12 +3,12 @@
 <head>
 <meta charset="utf-8">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; script-src 'self'">
-<title>DAD Ops Radio</title>
+<title>Dad Net</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;800&family=IBM+Plex+Mono:wght@500;600&display=swap">
 <style>
   html,body{margin:0;height:100%;background:#1a1914;overflow:hidden;user-select:none;font-family:"IBM Plex Mono",monospace}
   /* Only the rim drags the window. On Windows a drag area wins over anything
-     on top of it, so it must never sit under the radio or the PDA. */
+     on top of it, so it must never sit under the radio or the Battle Board. */
   body{-webkit-app-region:no-drag}
   .drag{-webkit-app-region:drag}
   button{-webkit-app-region:no-drag;cursor:pointer}
@@ -21,7 +21,9 @@
   #winbtns{display:flex;gap:6px}
   #winbtns button{width:30px;height:22px;border-radius:5px;background:#1a1812;border:1px solid #4a4434;color:#d9cfb6;font:600 13px/1 "IBM Plex Mono",monospace;padding:0}
   #winbtns button:hover{border-color:#F3B77A;color:#F3B77A}
-  #status{border:1px solid #2f2c22;border-radius:6px;display:flex;align-items:center;justify-content:center;gap:14px;font:600 10px "IBM Plex Mono",monospace;letter-spacing:.14em;color:#AEA06E;white-space:nowrap;overflow:hidden}
+  #status{border:1px solid #2f2c22;border-radius:6px;display:flex;align-items:center;justify-content:center;gap:10px;padding:0 8px;font:600 10px "IBM Plex Mono",monospace;letter-spacing:.14em;color:#AEA06E;white-space:nowrap;overflow:hidden}
+  #status span{flex:none}
+  #status .line{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis}
   #status .on{color:#F3B77A}
   #status .bad{color:#FF5B4F}
   #hinge{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px}
@@ -37,11 +39,11 @@
 <div id="chassis" class="abs"></div>
 <div id="rim" class="abs"></div>
 <span class="screw" id="s1"></span><span class="screw" id="s2"></span><span class="screw" id="s3"></span><span class="screw" id="s4"></span>
-<div id="engrave" class="abs">DAD OPS · FIELD KIT</div>
+<div id="engrave" class="abs">DAD NET · FIELD KIT</div>
 <div id="screen" class="abs"></div>
 <div id="dragT" class="abs drag"></div><div id="dragB" class="abs drag"></div><div id="dragL" class="abs drag"></div><div id="dragR" class="abs drag"></div>
-<div id="hinge" class="abs" hidden><i></i><button id="fold" class="vbtn" aria-label="Fold the Field PDA away" title="Fold the Field PDA away">◂ FOLD</button><i></i></div>
-<button id="unfold" class="abs vbtn" aria-label="Unfold the Field PDA" title="Unfold the Field PDA" hidden>FIELD PDA ▸</button>
+<div id="hinge" class="abs" hidden><i></i><button id="fold" class="vbtn" aria-label="Fold the Battle Board away" title="Fold the Battle Board away">◂ FOLD</button><i></i></div>
+<button id="unfold" class="abs vbtn" aria-label="Unfold the Battle Board" title="Unfold the Battle Board" hidden>BATTLE BOARD ▸</button>
 <div id="status" class="abs" role="status"></div>
 <!-- Last on purpose: on Windows, later click areas win over the drag strips. -->
 <div id="winbtns" class="abs" style="z-index:2"><button id="min" aria-label="Minimize" title="Minimize">–</button><button id="hide" aria-label="Hide to the tray (stays on net)" title="Hide to the tray (stays on net)">×</button></div>

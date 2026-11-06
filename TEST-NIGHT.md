@@ -1,4 +1,4 @@
-# DAD Ops Radio: test night checklist
+# Dad Net: test night checklist
 
 Grab 2–4 people on a casual night (Motor Pool Monday is perfect). Use
 headphones so the radio doesn't echo into your mic. Everyone keeps using
@@ -8,7 +8,8 @@ Send them the radio address and this:
 
 > Open this in Chrome or Edge on your PC (or your phone), sign in with the
 > same Discord you use on dadops.gg, click **Get on net**, allow the mic,
-> then click **Join net** on Command.
+> then click **Join net** on Recon. If you're in a Fireteam channel in
+> Discord, click **Take FTL** to talk on Command.
 
 ## The checks
 
@@ -19,8 +20,17 @@ Tick each one, and note anything odd.
 - [ ] A Recruit (if one's around) sees Command, Recon, Air Support and Logistics as "opens at
       Private" and can only listen to All-call
 
+**FTL seats**
+- [ ] Two people sit in different "Fireteam" channels in Discord. Each sees
+      their fireteam in the FIRETEAMS box within ~15 seconds, with **Take FTL**
+- [ ] Take FTL puts them on Command in Talk mode; the other person sees "Name · FT1 FTL"
+- [ ] A Private without a seat (and below Sergeant) only listens on Command
+- [ ] Tonight's Squad Leader can assign, change and clear a seat from the dropdown
+- [ ] An FTL leaves their Discord channel: the seat shows (away), then frees itself
+- [ ] **Go off net** then **Get back on net** works, and the Battle Board stays open
+
 **Command**
-- [ ] Two people join Command; one holds the talk button (or the key with the
+- [ ] Two FTLs (or Sergeants) are on Command; one holds the talk button (or the key with the
       radio tab in front). The other hears them, in the **left ear**
 - [ ] The card shows "<name> is talking" while they talk, and it clears when they stop
 - [ ] Someone **not** on Command hears nothing

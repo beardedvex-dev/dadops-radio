@@ -3,15 +3,23 @@
 <head>
 <meta charset="utf-8">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; script-src 'self'">
-<title>DAD Ops Radio overlay</title>
+<title>Dad Net overlay</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@600;700&family=Big+Shoulders+Display:wght@800&family=Black+Ops+One&display=swap">
 <style>
   html,body{margin:0;background:transparent;overflow:hidden;font-family:Barlow,"Segoe UI",sans-serif;color:#EFE6D2;user-select:none}
+  body{height:100vh;display:flex;flex-direction:column}
+  /* The rows grow away from the screen edge the overlay sits on. */
+  body.h-right{align-items:flex-end} body.h-right .wrap{align-items:flex-end}
+  body.v-bottom{justify-content:flex-end} body.v-bottom .wrap{flex-direction:column-reverse}
+  body.moving{outline:2px dashed #F3B77A;outline-offset:-2px;background:rgba(14,14,11,.35)}
+  #mover{display:flex;align-items:center;gap:8px;margin:6px;padding:6px 8px;background:#F3B77A;color:#0E0E0B;border-radius:6px;font:700 12px Barlow,sans-serif;-webkit-app-region:drag;cursor:move}
+  #mover button{-webkit-app-region:no-drag;margin-left:auto;border:0;border-radius:4px;background:#0E0E0B;color:#F3B77A;font:700 12px Barlow,sans-serif;padding:4px 10px;cursor:pointer}
+  [hidden]{display:none!important}
   .wrap{display:flex;flex-direction:column;gap:4px;padding:8px;width:fit-content;min-width:200px}
   .head{display:flex;align-items:center;gap:6px;padding:0 2px 2px}
   .head img{width:18px;height:18px}
   .head span{font-family:"Black Ops One",sans-serif;font-size:11px;letter-spacing:1.5px;text-shadow:0 1px 2px #000}
-  .row{display:flex;align-items:center;gap:8px;padding:5px 10px;background:rgba(14,14,11,.72);border:1px solid rgba(174,160,110,.35);border-radius:6px;font-size:13px}
+  .row{display:flex;align-items:center;gap:8px;max-width:300px;overflow:hidden;white-space:nowrap;padding:5px 10px;background:rgba(14,14,11,.72);border:1px solid rgba(174,160,110,.35);border-radius:6px;font-size:13px}
   .tag{font-family:"Big Shoulders Display",sans-serif;font-weight:800;font-size:14px;letter-spacing:1px;padding:0 5px;border-radius:3px;color:#AEA06E;border:1px solid #746B42}
   .quiet{color:#A39B86;font-size:12px}
   .live{background:rgba(14,14,11,.88);border-color:#F3B77A}
@@ -32,6 +40,7 @@
 </style>
 </head>
 <body>
+<div id="mover" hidden><span>DRAG ME TO MOVE THE OVERLAY</span><button id="done">Done</button></div>
 <div class="wrap" id="wrap"></div>
 <script src="overlay.js"></script>
 </body>

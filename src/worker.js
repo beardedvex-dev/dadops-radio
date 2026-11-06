@@ -1,5 +1,5 @@
 // =====================================================================
-//  DAD Ops Radio - net control (Cloudflare Worker + one Durable Object)
+//  Dad Net (DAD Ops radio) - net control (Cloudflare Worker + one Durable Object)
 //
 //  What runs where:
 //    * This Worker sends out the test page (the files in /public) and
@@ -24,10 +24,12 @@
 // The nets, in the order they show. To add one: copy a line, give it a new
 // key (lowercase, no spaces), name, short tag and description, then push.
 //   listen/talk: "private" = Private and up, "member" = everyone signed in,
-//                "allcall" = S3 + tonight's Squad Leader
+//                "allcall" = S3 + tonight's Squad Leader,
+//                "lead" = Sergeant and up, S3, tonight's Squad Leader, and
+//                         whoever holds a fireteam's FTL seat
 export const NETS = {
-  command: { name: "Command", short: "CMD", listen: "private", talk: "private", joinable: true,
-             desc: "Fireteam leads talking to each other." },
+  command: { name: "Command", short: "CMD", listen: "private", talk: "lead", joinable: true,
+             desc: "Fireteam leads (FTLs), the Squad Leader and Sergeants and up." },
   recon:   { name: "Recon", short: "RCN", listen: "private", talk: "private", joinable: true,
              desc: "Scouts and snipers calling out what they see." },
   air:     { name: "Air Support", short: "AIR", listen: "private", talk: "private", joinable: true,
@@ -97,14 +99,14 @@ export async function whoIs(env, token, now = Date.now()) {
   // starts within the next 2 hours.
   let squadLeader = false, tonight = null;
   const from = new Date(now - 5 * 3600e3).toISOString(), to = new Date(now + 2 * 3600e3).toISOString();
-  const ores = await fetch(`${base}/rest/v1/ops?select=id,title,starts_at,lead_id&cancelled=eq.false&starts_at=gte.${from}&starts_at=lte.${to}&order=starts_at.asc`, { headers: h });
+  const ores = await fetch(`${base}/rest/v1/ops?select=id,title,details,starts_at,lead_id&cancelled=eq.false&starts_at=gte.${from}&starts_at=lte.${to}&order=starts_at.asc`, { headers: h });
   if (ores.ok) {
     const ops = await ores.json();
     if (Array.isArray(ops) && ops.length) {
       const mine = ops.find((o) => o.lead_id === user.id);
       squadLeader = !!mine;
       const o = mine || ops[0];
-      tonight = { title: o.title, startsAt: o.starts_at };
+      tonight = { title: o.title, details: o.details || "", startsAt: o.starts_at };
     }
   }
 
@@ -124,12 +126,22 @@ export function voiceTag(name) {
   return clean.length > 16 ? clean.slice(0, 15) + "…" : clean || "Voice";
 }
 
+// The dadops.gg rank ladder, lowest first (same codes as the website).
+const RANK_ORDER = ["recruit", "pvt", "pfc", "cpl", "sgt", "sfc", "2lt", "1lt", "cpt", "maj", "ltc", "col"];
+export const rankAtLeast = (rank, min) => RANK_ORDER.indexOf(rank) >= RANK_ORDER.indexOf(min) && RANK_ORDER.indexOf(rank) >= 0;
+
+// The night an op belongs to (Eastern time, rolling over at 6 AM), for resetting FTL seats.
+export function opDay(now = Date.now()) {
+  return new Date(now - 6 * 3600e3).toLocaleDateString("en-CA", { timeZone: "America/New_York" });
+}
+
 export function rights(me) {
   const can = { listen: [], talk: [] };
   const isPrivate = me.level === "private";
   for (const [key, net] of Object.entries(NETS)) {
     const listen = net.listen === "member" || (net.listen === "private" && isPrivate);
-    const talk = net.talk === "private" ? isPrivate : net.talk === "allcall" ? (me.staff || me.squadLeader) : false;
+    const talk = net.talk === "private" ? isPrivate : net.talk === "allcall" ? (me.staff || me.squadLeader)
+      : net.talk === "lead" ? (isPrivate && (rankAtLeast(me.rank, "sgt") || me.staff || me.squadLeader)) : false;
     if (listen) can.listen.push(key);
     if (talk) can.talk.push(key);
   }
@@ -143,6 +155,9 @@ export class Radio {
   constructor(ctx, env) {
     this.ctx = ctx;
     this.env = env;
+    // FTL seats: { day, list: { [fireteam channel id]: { userId, callsign, at, by, awaySince } } }
+    this.seatState = { day: "", list: {} };
+    ctx.blockConcurrencyWhile(async () => { this.seatState = (await ctx.storage.get("seats")) || this.seatState; });
   }
 
   async fetch(request) {
@@ -169,7 +184,7 @@ export class Radio {
   // ---------- which Discord voice channel each person is in ----------
   discord(path) {
     const base = (this.env.DISCORD_API || "https://discord.com/api/v10").replace(/\/+$/, "");
-    return fetch(base + path, { headers: { Authorization: `Bot ${this.env.DISCORD_BOT_TOKEN}`, "User-Agent": "DAD Ops Radio (dadops.gg, 1.0)" } });
+    return fetch(base + path, { headers: { Authorization: `Bot ${this.env.DISCORD_BOT_TOKEN}`, "User-Agent": "Dad Net (dadops.gg, 1.0)" } });
   }
   async voiceTick() {
     if (!this.env.DISCORD_BOT_TOKEN || !/^\d+$/.test(String(this.env.DISCORD_RALLY_POINT_ID || ""))) return;
@@ -196,13 +211,83 @@ export class Radio {
           else if (r.ok) {
             const j = await r.json();
             const name = j.channel_id ? (this.chanNames && this.chanNames.get(String(j.channel_id))) || "Voice" : null;
-            voice = name ? { name, tag: voiceTag(name) } : null;
+            voice = name ? { id: String(j.channel_id), name, tag: voiceTag(name) } : null;
           }
         } catch {}
         if (JSON.stringify(voice) !== JSON.stringify(a.voice || null)) { a.voice = voice; ws.serializeAttachment(a); changed = true; }
       }));
     }
+    if (this.seatsTick()) changed = true;
     if (changed) this.pushRoster();
+  }
+
+  // ---------- FTL seats ----------
+  seats() {
+    if (this.seatState.day !== opDay()) { this.seatState = { day: opDay(), list: {} }; this.saveSeats(); } // fresh every op night
+    return this.seatState.list;
+  }
+  saveSeats() { this.ctx.waitUntil(this.ctx.storage.put("seats", this.seatState)); }
+  seatOf(userId) { const l = this.seats(); return Object.keys(l).find((ch) => l[ch].userId === userId) || null; }
+  isFireteam(ch) { const n = this.chanNames && this.chanNames.get(String(ch)); return !!n && /^FT\d+$/.test(voiceTag(n)); }
+  canTalk(a, net) {
+    if (a.can.talk.includes(net)) return true;
+    return net === "command" && a.me.level === "private" && !!this.seatOf(a.me.id);
+  }
+  // After someone gains or loses a seat: a seat holder goes on Command to talk;
+  // someone who can no longer talk there drops back to listening.
+  fixCommand(ws, a, gotSeat) {
+    const nets = new Set(a.nets), mon = new Set(a.monitor || []);
+    if (gotSeat) { nets.add("command"); mon.delete("command"); }
+    else if (nets.has("command") && !this.canTalk(a, "command")) mon.add("command");
+    a.nets = Object.keys(NETS).filter((n) => nets.has(n));
+    a.monitor = a.nets.filter((n) => mon.has(n));
+    let stopped = false;
+    if (a.talking === "command" && (a.monitor.includes("command") || !a.nets.includes("command"))) { a.talking = null; stopped = true; }
+    ws.serializeAttachment(a);
+    this.send(ws, { t: "mine", nets: a.nets, monitor: a.monitor });
+    if (stopped) this.broadcast({ t: "talking", conn: a.conn, net: null });
+  }
+  dropSeat(ch) {
+    const l = this.seats(), seat = l[ch];
+    if (!seat) return;
+    delete l[ch]; this.saveSeats();
+    const m = this.members().find(({ a }) => a.me.id === seat.userId);
+    if (m) this.fixCommand(m.ws, m.a, false);
+  }
+  giveSeat(ch, ws, a, by) {
+    const l = this.seats();
+    const old = this.seatOf(a.me.id);
+    if (old && old !== ch) delete l[old]; // one seat per person
+    l[ch] = { userId: a.me.id, callsign: a.me.callsign, at: Date.now(), by, awaySince: null };
+    this.saveSeats();
+    this.fixCommand(ws, a, true);
+  }
+  // A seat frees itself once its FTL has been out of that channel (or off Dad Net) for a minute.
+  seatsTick(now = Date.now()) {
+    const l = this.seats();
+    let changed = false;
+    for (const ch of Object.keys(l)) {
+      const seat = l[ch];
+      const m = this.members().find(({ a }) => a.me.id === seat.userId);
+      const here = m && m.a.voice && m.a.voice.id === ch;
+      if (here) { if (seat.awaySince) { seat.awaySince = null; this.saveSeats(); } continue; }
+      if (!seat.awaySince) { seat.awaySince = now; this.saveSeats(); continue; }
+      if (now - seat.awaySince > (+this.env.SEAT_AWAY_MS || 60e3)) { this.dropSeat(ch); changed = true; }
+    }
+    return changed;
+  }
+  seatsView() {
+    const l = this.seats(), ms = this.members();
+    const chans = new Set(Object.keys(l));
+    for (const { a } of ms) if (a.voice && a.voice.id && this.isFireteam(a.voice.id)) chans.add(a.voice.id);
+    const num = (ch) => +((/\d+/.exec(voiceTag(this.chanNames && this.chanNames.get(ch))) || [999])[0]);
+    return [...chans].sort((x, y) => num(x) - num(y)).map((ch) => {
+      const name = (this.chanNames && this.chanNames.get(ch)) || "Fireteam";
+      const seat = l[ch];
+      const holder = seat ? ms.find(({ a }) => a.me.id === seat.userId) : null;
+      return { ch, name, tag: voiceTag(name), count: ms.filter(({ a }) => a.voice && a.voice.id === ch).length,
+        holder: seat ? { id: seat.userId, callsign: seat.callsign, conn: holder ? holder.a.conn : null, away: !!seat.awaySince } : null };
+    });
   }
 
   members() {
@@ -215,16 +300,20 @@ export class Radio {
   }
 
   roster() {
+    const l = this.seats();
+    const ftlOf = (id) => { const ch = Object.keys(l).find((c) => l[c].userId === id); return ch ? voiceTag(this.chanNames && this.chanNames.get(ch)) : null; };
     return this.members().map(({ a }) => ({
       id: a.me.id, conn: a.conn, callsign: a.me.callsign, rank: a.me.rank || null, level: a.me.level, staff: a.me.staff,
-      squadLeader: a.me.squadLeader, voice: a.voice || null, nets: a.nets, monitor: a.monitor || [], talking: a.talking || null,
+      squadLeader: a.me.squadLeader, voice: a.voice ? { name: a.voice.name, tag: a.voice.tag, id: a.voice.id } : null,
+      ftl: ftlOf(a.me.id), lead: !!(a.can && a.can.talk.includes("command")),
+      nets: a.nets, monitor: a.monitor || [], talking: a.talking || null,
       published: !!(a.sessionId && a.trackName),
     }));
   }
 
   send(ws, msg) { try { ws.send(JSON.stringify(msg)); } catch {} }
   broadcast(msg) { const s = JSON.stringify(msg); for (const { ws } of this.members()) { try { ws.send(s); } catch {} } }
-  pushRoster() { this.broadcast({ t: "roster", members: this.roster() }); }
+  pushRoster() { this.broadcast({ t: "roster", members: this.roster(), seats: this.seatsView() }); }
 
   sfu(path, method, body) {
     const base = (this.env.SFU_BASE || "https://rtc.live.cloudflare.com/v1").replace(/\/+$/, "");
@@ -252,7 +341,7 @@ export class Radio {
         // Everyone hears All-call. Command and Air are opt-in.
         const nets = can.listen.filter((n) => !NETS[n].joinable);
         ws.serializeAttachment({ state: "on", me, can, conn, nets, talking: null });
-        reply({ t: "welcome", me: { ...me, discordId: undefined }, can, conn, nets: NETS, roster: this.roster() });
+        reply({ t: "welcome", me: { ...me, discordId: undefined }, can, conn, nets: NETS, roster: this.roster(), seats: this.seatsView() });
         this.pushRoster();
         this.ctx.waitUntil(this.voiceTick()); // look up their Discord channel straight away
         return;
@@ -265,7 +354,8 @@ export class Radio {
         if (msg.t === "join" && !a.can.listen.includes(net)) return reply({ t: "error", reason: `${NETS[net].name} opens at Private.` });
         // mode "monitor" = listen only on that net; "talk" (or none) = listen and talk.
         const nets = new Set(a.nets), mon = new Set(a.monitor || []);
-        if (msg.t === "join") { nets.add(net); msg.mode === "monitor" ? mon.add(net) : mon.delete(net); }
+        const listenOnly = msg.mode === "monitor" || !this.canTalk(a, net); // e.g. Command without a seat or Sergeant
+        if (msg.t === "join") { nets.add(net); listenOnly ? mon.add(net) : mon.delete(net); }
         else { nets.delete(net); mon.delete(net); }
         a.nets = Object.keys(NETS).filter((n) => nets.has(n));
         a.monitor = a.nets.filter((n) => mon.has(n));
@@ -280,13 +370,42 @@ export class Radio {
 
       if (msg.t === "talk") {
         const net = msg.net || null;
-        if (net && (!a.can.talk.includes(net) || !a.nets.includes(net))) return reply({ t: "error", reason: "You can't talk on that net." });
+        if (net && (!this.canTalk(a, net) || !a.nets.includes(net))) return reply({ t: "error", reason: net === "command" ? "Take your fireteam's FTL seat to talk on Command." : "You can't talk on that net." });
         if (net && (a.monitor || []).includes(net)) return reply({ t: "error", reason: "You're only monitoring that net." });
         if (net && !(a.sessionId && a.trackName)) return reply({ t: "error", reason: "Your mic isn't connected yet." });
         if ((a.talking || null) === net) return;
         a.talking = net;
         ws.serializeAttachment(a);
         this.broadcast({ t: "talking", conn: a.conn, net });
+        return;
+      }
+
+      if (msg.t === "seat") {
+        const ch = String(msg.ch || "");
+        const l = this.seats();
+        const boss = a.me.staff || a.me.squadLeader; // tonight's Squad Leader and S3 run the board
+        if (msg.op === "claim") {
+          if (a.me.level !== "private") return reply({ t: "error", reason: "FTL seats open at Private." });
+          if (!a.voice || a.voice.id !== ch || !this.isFireteam(ch)) return reply({ t: "error", reason: "Join that fireteam's Discord channel first." });
+          if (l[ch] && l[ch].userId !== a.me.id) return reply({ t: "error", reason: `${l[ch].callsign} already has that seat.` });
+          this.giveSeat(ch, ws, a, a.me.id);
+        } else if (msg.op === "release") {
+          if (!l[ch] || (l[ch].userId !== a.me.id && !boss)) return reply({ t: "error", reason: "That isn't your seat." });
+          this.dropSeat(ch);
+        } else if (msg.op === "assign") {
+          if (!boss) return reply({ t: "error", reason: "Only tonight's Squad Leader or S3 can assign seats." });
+          const t = this.members().find(({ a: b }) => b.conn === msg.conn);
+          if (!t) return reply({ t: "error", reason: "They're not on Dad Net right now." });
+          if (t.a.me.level !== "private") return reply({ t: "error", reason: "FTL seats open at Private." });
+          if (!this.isFireteam(ch)) return reply({ t: "error", reason: "That isn't a fireteam channel." });
+          if (l[ch] && l[ch].userId !== t.a.me.id) this.dropSeat(ch);
+          this.giveSeat(ch, t.ws, t.a, a.me.id);
+        } else if (msg.op === "clear") {
+          if (!boss) return reply({ t: "error", reason: "Only tonight's Squad Leader or S3 can clear seats." });
+          this.dropSeat(ch);
+        } else return;
+        reply({ t: "ok" });
+        this.pushRoster();
         return;
       }
 
@@ -353,6 +472,7 @@ export class Radio {
     if (a.state === "on") {
       ws.serializeAttachment({ state: "gone" });
       if (a.talking) this.broadcast({ t: "talking", conn: a.conn, net: null });
+      this.seatsTick(); // starts the one-minute clock on their FTL seat, if they had one
       this.pushRoster();
     }
   }

@@ -14,4 +14,7 @@ contextBridge.exposeInMainWorld("dadopsDesktop", {
   pda: (show) => ipcRenderer.send("dadops:pda", show),
   checkUpdates: () => ipcRenderer.send("dadops:check-updates"),
   setPdaKey: () => ipcRenderer.send("dadops:pda-key"),
+  // v0.5+
+  overlayCmd: (o) => ipcRenderer.send("dadops:overlay-set", o), // { corner, scale, opacity, move }
+  onNetCmd: (fn) => ipcRenderer.on("dadops:netcmd", (_e, c) => fn(c)), // tray: "off" / "on"
 });

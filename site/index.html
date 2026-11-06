@@ -3,10 +3,10 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>DAD Ops Radio</title>
-<meta name="description" content="DAD Ops Radio: talk to the other fireteam leads without leaving your squad's Discord channel. Extra nets, in-game talk keys, an overlay and the Field PDA in one field kit.">
+<title>Dad Net · DAD Ops</title>
+<meta name="description" content="Dad Net: DAD Ops' own radio. Talk to the other fireteam leads without leaving your squad's Discord channel. FTL seats, extra nets, in-game talk keys, an overlay and the Battle Board in one field kit.">
 <link rel="icon" type="image/png" href="/img/patch.png">
-<meta property="og:title" content="DAD Ops Radio">
+<meta property="og:title" content="Dad Net">
 <meta property="og:description" content="Talk to the other fireteam leads without leaving your squad's channel.">
 <meta property="og:image" content="https://radio.dadops.gg/img/kit-open.png">
 <meta name="theme-color" content="#0e0e0b">
@@ -70,7 +70,7 @@
 <header class="top">
   <div class="wrap">
     <img src="/img/patch.png" alt="" width="34" height="34">
-    <a class="brand" href="/">DAD OPS RADIO</a>
+    <a class="brand" href="/">DAD NET</a>
     <nav aria-label="Page"><a href="#how">How it works</a><a href="#nets">Nets</a><a href="#setup">Setup</a><a href="#faq">Questions</a><a href="https://dadops.gg">dadops.gg</a></nav>
   </div>
 </header>
@@ -79,16 +79,16 @@
   <div class="wrap hero">
     <div>
       <div class="lbl">DAD Ops · comms</div>
-      <h1>DAD OPS RADIO</h1>
+      <h1>DAD NET</h1>
       <p class="script">Limited Availability</p>
-      <p class="lead">Talk to the other fireteam leads without leaving your squad's Discord channel. Hold a key, reach every lead on Command, and keep playing.</p>
+      <p class="lead">DAD Ops' own radio. Talk to the other fireteam leads without leaving your squad's Discord channel. Take your fireteam's FTL seat, hold a key, reach every lead on Command, and keep playing.</p>
       <div class="ctas">
         <a class="btn primary" id="dl" href="https://github.com/beardedvex-dev/DadOps-Radio/releases/latest">Download for Windows <small id="dl-ver"></small></a>
         <a class="btn ghost" href="https://dadops-radio.beardedvex.workers.dev">Open in your browser</a>
       </div>
       <p class="fine">Free. Windows 10/11. Sign in with the same Discord you use on dadops.gg. The browser version works on Mac and phones too (keys only while its tab is in front).</p>
     </div>
-    <img class="shot" src="/img/kit-open.png" alt="The DAD Ops field kit: the radio on the left with Command, Recon, Logistics and All-call, and the Field PDA folded out on the right" width="1640" height="840">
+    <img class="shot" src="/img/kit-open.png" alt="The Dad Net field kit: the radio on the left with the fireteams and Command, and the Battle Board folded out on the right with tonight's op, the squad board, timers and notes" width="1600" height="860">
   </div>
 
   <section id="how">
@@ -97,8 +97,8 @@
       <h2>Discord for your squad. The radio for everyone else.</h2>
       <div class="grid3">
         <div class="card"><h3>Stay in your channel</h3><p>Your fireteam keeps talking in its Discord channel with your normal Discord push-to-talk. Nothing about that changes.</p></div>
-        <div class="card"><h3>Key up on a net</h3><p>Hold your Command key (say <kbd>Mouse 5</kbd>) and every lead on Command hears you, in one ear, at the volume they set. Your squad doesn't hear the chatter.</p></div>
-        <div class="card"><h3>See who's talking</h3><p>A small overlay in the corner shows who's on which net, with their fireteam from Discord: <em>Pickles · FT1</em>. Press <kbd>F9</kbd> for the whole field kit.</p></div>
+        <div class="card"><h3>Take the FTL seat</h3><p>Each Discord fireteam channel gets one FTL seat. Click <b>Take FTL</b>, hold your Command key (say <kbd>Mouse 5</kbd>) and every lead hears you, in one ear. Your squad doesn't hear the chatter.</p></div>
+        <div class="card"><h3>See who's talking</h3><p>A small overlay in the corner shows who's on which net, with their seat: <em>Pickles · FT1 FTL</em>. Put it in any corner, any size. Press <kbd>F9</kbd> for the whole field kit.</p></div>
       </div>
     </div>
   </section>
@@ -111,7 +111,7 @@
         <table>
           <thead><tr><th scope="col">Net</th><th scope="col">For</th><th scope="col">Who</th><th scope="col">Ear</th></tr></thead>
           <tbody>
-            <tr><td><span class="bar"></span><b>Command</b></td><td>Fireteam leads talking to each other</td><td>Private and up</td><td>Left</td></tr>
+            <tr><td><span class="bar"></span><b>Command</b></td><td>Fireteam leads talking to each other</td><td>Talk: FTL seat holders, Sergeants and up, tonight's Squad Leader, S3. Privates can listen in</td><td>Left</td></tr>
             <tr><td><span class="bar"></span><b>Recon</b></td><td>Scouts and snipers calling out what they see</td><td>Private and up</td><td>Right</td></tr>
             <tr><td><span class="bar"></span><b>Air Support</b></td><td>Heli pilots and air support calls</td><td>Private and up</td><td>Right</td></tr>
             <tr><td><span class="bar"></span><b>Logistics / Vehicles</b></td><td>Drivers, supply runs and vehicle moves</td><td>Private and up</td><td>Right</td></tr>
@@ -131,12 +131,12 @@
         <div style="display:flex;flex-direction:column;gap:16px">
           <div class="step"><span class="num">1</span><div><h3>Install</h3><p style="margin:0;color:var(--soft)">Download, run it. Windows may say <em>"Windows protected your PC"</em> because the app is new: click <b>More info</b> → <b>Run anyway</b>.</p></div></div>
           <div class="step"><span class="num">2</span><div><h3>Sign in</h3><p style="margin:0;color:var(--soft)">Sign in with Discord (the same account as dadops.gg). It gets on net by itself; allow the microphone if Windows asks.</p></div></div>
-          <div class="step"><span class="num">3</span><div><h3>Join and set your keys</h3><p style="margin:0;color:var(--soft)">Click <b>Join net</b> on Command, then click its key box and press the button you want. Use a mouse button or a key you never type with: talk keys work everywhere, even while you type.</p></div></div>
+          <div class="step"><span class="num">3</span><div><h3>Take a seat, set your keys</h3><p style="margin:0;color:var(--soft)">Leading a fireteam? Click <b>Take FTL</b> by your Discord channel. Then click Command's key box and press the button you want. Use a mouse button or a key you never type with: talk keys work everywhere, even while you type.</p></div></div>
           <div class="step"><span class="num">4</span><div><h3>Game in Borderless</h3><p style="margin:0;color:var(--soft)">Set WARDOGS to <b>Borderless</b> or <b>Windowed</b> so the overlay and the field kit can show on top. Nothing can draw over exclusive Fullscreen.</p></div></div>
         </div>
       </div>
       <div>
-        <img class="shot" src="/img/kit-folded.png" alt="The radio folded: header cells, tonight's op, and the nets with Command talking" width="520" height="840" style="max-width:420px;margin:0 auto">
+        <img class="shot" src="/img/kit-folded.png" alt="Dad Net folded: tonight's op, the fireteams with their FTLs, and Command with Bob, FT2's FTL, talking" width="480" height="860" style="max-width:420px;margin:0 auto">
       </div>
     </div>
   </section>
@@ -144,10 +144,10 @@
   <section>
     <div class="wrap">
       <div class="lbl">The field kit</div>
-      <h2>Radio and Field PDA, one device</h2>
+      <h2>Radio and Battle Board, one device</h2>
       <div class="grid3">
-        <div class="card"><h3>F9 anywhere</h3><p>Pops the whole kit up over the game with the Field PDA folded out. Press it again to tuck it away. The radio stays on net the whole time.</p></div>
-        <div class="card"><h3>Fold it</h3><p>Just want the radio? <b>◂ FOLD</b> on the hinge. Want the PDA back? The <b>FIELD PDA ▸</b> tab on the edge.</p></div>
+        <div class="card"><h3>F9 anywhere</h3><p>Pops the kit up over the game with the <b>Battle Board</b> folded out: tonight's op and countdown, the squad board with every fireteam and FTL, your comms, a stopwatch, a countdown timer and a notepad. Press it again to tuck it away.</p></div>
+        <div class="card"><h3>Fold it</h3><p>Just want the radio? <b>◂ FOLD</b> on the hinge. Want the board back? The <b>BATTLE BOARD ▸</b> tab on the edge. Need a break? <b>Go off net</b> and the kit stays open.</p></div>
         <div class="card"><h3>Lives in the tray</h3><p><b>×</b> hides it by the clock and keeps you on net. It can start with Windows, and it updates itself.</p></div>
       </div>
     </div>
@@ -163,14 +163,16 @@
       <details><summary>The overlay or the kit doesn't show over the game</summary><p>Switch the game to Borderless or Windowed. Also check <b>Show the overlay in-game</b> is ticked in the Desktop app drawer.</p></details>
       <details><summary>"Windows protected your PC" or an antivirus warning</summary><p>The app isn't code-signed yet, and new apps that listen for keys sometimes get flagged. Click <b>More info</b> → <b>Run anyway</b>. The code is public on GitHub.</p></details>
       <details><summary>Mac, Linux or phone?</summary><p>The desktop app is Windows only. The <a href="https://dadops-radio.beardedvex.workers.dev">browser version</a> works anywhere, with keys while its tab is in front and hold-to-talk buttons.</p></details>
-      <details><summary>Who can use it?</summary><p>DAD Ops members signed in on dadops.gg. Recruits can listen to All-call; everything else opens at Private.</p></details>
+      <details><summary>Who can use it?</summary><p>DAD Ops members signed in on dadops.gg. Recruits can listen to All-call; everything else opens at Private. Talking on Command takes your fireteam's FTL seat or Sergeant and up.</p></details>
+      <details><summary>How do FTL seats work?</summary><ul><li>Every Discord voice channel named "Fireteam" plus a number gets one FTL seat. Anyone Private+ sitting in that channel can take it.</li><li>Tonight's Squad Leader and S3 can assign, change or clear seats.</li><li>Leave your fireteam's channel and the seat frees itself after about a minute. Seats reset every op night.</li></ul></details>
+      <details><summary>Where did the Field PDA go?</summary><p>It's still on <a href="https://dadops.gg/pda">dadops.gg</a>. The app now folds out the Battle Board, built for the op itself, with a link to the full PDA at the bottom.</p></details>
     </div>
   </section>
 </main>
 
 <footer>
   <div class="wrap">
-    <span>DAD Ops Radio · <span style="font-family:Yellowtail,cursive;font-size:20px;color:var(--tan)">Limited Availability</span></span>
+    <span>Dad Net · <span style="font-family:Yellowtail,cursive;font-size:20px;color:var(--tan)">Limited Availability</span></span>
     <span>Tactical when it counts. Cold ones the rest of the time. · <a href="https://dadops.gg">dadops.gg</a></span>
   </div>
 </footer>

@@ -1,11 +1,11 @@
-// DAD Ops Radio - browser test page.
+// Dad Net - the radio page (the browser version, and the radio inside the desktop app).
 // Signs in with the dadops.gg Discord login, connects to the net control
 // (/api/net) and the Cloudflare voice relay, and plays each net in the
-// ear and at the volume you pick.
+// ear and at the volume you pick. It also feeds the Battle Board (board.html).
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/+esm";
 
 const $ = (id) => document.getElementById(id);
-const VIEWS = ["v-signin", "v-ready", "v-net", "v-denied"];
+const VIEWS = ["v-signin", "v-ready", "v-net", "v-denied", "v-off"];
 const show = (v) => VIEWS.forEach((id) => ($(id).hidden = id !== v));
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 
@@ -51,10 +51,10 @@ const R = {
   ctx: null, pc: null, mic: null, micTrack: null, chain: Promise.resolve(),
   pipes: new Map(), // conn -> { gain, pan, el, analyser }
   midToConn: new Map(), pulled: new Set(),
-  tx: null, capture: null, cards: {}, retry: 0, stopping: false,
+  tx: null, capture: null, cards: {}, retry: 0, stopping: false, seats: [], off: false,
 };
 window.__radio = R; // handy when testing from the browser console
-// Set when this page is running inside the DAD Ops Radio desktop app.
+// Set when this page is running inside the Dad Net desktop app.
 const DESK = window.dadopsDesktop || null;
 
 // ---------- sign in ----------
@@ -100,7 +100,7 @@ async function connect() {
   const w = await ask({ t: "hello", token: R.token });
   if (w.t === "denied") { $("denied-why").textContent = w.reason; R.stopping = true; return show("v-denied"); }
   if (w.t !== "welcome") throw new Error(w.reason || "Couldn't get on net.");
-  R.me = w.me; R.can = w.can; R.conn = w.conn; R.nets = w.nets; R.roster = w.roster; R.retry = 0;
+  R.me = w.me; R.can = w.can; R.conn = w.conn; R.nets = w.nets; R.roster = w.roster; R.seats = w.seats || []; R.retry = 0;
   buildNets();
   show("v-net");
   setStatus("Connecting voice", "");
@@ -113,7 +113,13 @@ async function connect() {
 function onMessage(m) {
   if (m.re && R.waiting.has(m.re)) { const w = R.waiting.get(m.re); R.waiting.delete(m.re); return w.ok(m); }
   if (m.t === "error" && !m.re) { R.lastTalkErr = m.reason; showLastKey(); if (R.tx) { R.tx = null; if (R.micTrack) R.micTrack.enabled = false; render(); } flash(m.reason); return; }
-  if (m.t === "roster") { R.roster = m.members; render(); pullAll(); }
+  if (m.t === "roster") { R.roster = m.members; if (m.seats) R.seats = m.seats; render(); pullAll(); }
+  else if (m.t === "mine") { // the switchboard moved us (an FTL seat taken or lost)
+    const me = myEntry();
+    if (me) { me.nets = m.nets || []; me.monitor = m.monitor || []; }
+    if (R.tx && !canTalkHere(R.tx)) stopTalk(true);
+    render();
+  }
   else if (m.t === "talking") {
     const p = R.roster.find((x) => x.conn === m.conn);
     if (p) p.talking = m.net;
@@ -308,10 +314,23 @@ function mix() {
 
 function myNets() { const me = R.roster.find((x) => x.conn === R.conn); return me ? me.nets : []; }
 function myMonitor() { const me = R.roster.find((x) => x.conn === R.conn); return (me && me.monitor) || []; }
+function myEntry() { return R.roster.find((x) => x.conn === R.conn); }
+// Can I talk on this net at all? Command also opens to whoever holds a fireteam's FTL seat.
+function canTalkNet(n) {
+  if (!R.can) return false;
+  if (R.can.talk.includes(n)) return true;
+  const me = myEntry();
+  return n === "command" && !!(me && me.ftl);
+}
+const canTalkHere = (n) => canTalkNet(n) && myNets().includes(n) && !myMonitor().includes(n);
+
+// A short "who is this" label: "FT2 FTL", "SL", or their Discord channel tag.
+function roleTag(p) { return p.ftl ? `${p.ftl} FTL` : p.squadLeader ? "SL" : p.voice ? p.voice.tag : ""; }
+const withTag = (p) => p.callsign + (roleTag(p) ? ` · ${roleTag(p)}` : "");
 
 // ---------- talking ----------
 function startTalk(net) {
-  if (R.tx || !R.micTrack || !R.can.talk.includes(net) || !myNets().includes(net) || myMonitor().includes(net)) return;
+  if (R.tx || !R.micTrack || !canTalkNet(net) || !myNets().includes(net) || myMonitor().includes(net)) return;
   R.tx = net;
   R.micTrack.enabled = true;
   tell({ t: "talk", net });
@@ -337,13 +356,13 @@ window.addEventListener("keydown", (e) => {
     if (R.capture) { e.preventDefault(); if (e.code === "Escape") endCapture(); else setKey(R.capture, { code: e.code }); return; }
     if (e.repeat || typing()) return;
     const n = netForInput(e);
-    if (n && R.can && R.can.talk.includes(n) && Date.now() - (R.capturedAt || 0) > 500) { e.preventDefault(); startTalk(n); }
+    if (n && canTalkNet(n) && Date.now() - (R.capturedAt || 0) > 500) { e.preventDefault(); startTalk(n); }
     return;
   }
   if (R.capture) { e.preventDefault(); if (e.code !== "Escape") setKey(R.capture, { code: e.code }); else endCapture(); return; }
   if (e.repeat || typing()) return;
   const n = netForInput(e);
-  if (n && R.can && R.can.talk.includes(n)) { e.preventDefault(); startTalk(n); }
+  if (n && canTalkNet(n)) { e.preventDefault(); startTalk(n); }
 });
 window.addEventListener("keyup", (e) => { const n = netForInput(e); if (n && R.tx === n) stopTalk(); });
 window.addEventListener("mousedown", (e) => {
@@ -352,13 +371,13 @@ window.addEventListener("mousedown", (e) => {
     if (R.capture && e.button !== 0 && e.button !== 2) { e.preventDefault(); setKey(R.capture, { button: e.button }); return; }
     if (e.button === 0 || e.button === 2) return;
     const n = netForInput(e);
-    if (n && R.can && R.can.talk.includes(n) && Date.now() - (R.capturedAt || 0) > 500) startTalk(n);
+    if (n && canTalkNet(n) && Date.now() - (R.capturedAt || 0) > 500) startTalk(n);
     return;
   }
   if (R.capture && e.button > 0) { e.preventDefault(); return setKey(R.capture, { button: e.button }); }
   if (e.button === 0) return;
   const n = netForInput(e);
-  if (n && R.can && R.can.talk.includes(n)) { e.preventDefault(); startTalk(n); }
+  if (n && canTalkNet(n)) { e.preventDefault(); startTalk(n); }
 });
 window.addEventListener("mouseup", (e) => { if (e.button === 3 || e.button === 4) e.preventDefault(); const n = netForInput(e); if (n && R.tx === n) stopTalk(); });
 window.addEventListener("contextmenu", (e) => { if (R.capture) e.preventDefault(); });
@@ -382,13 +401,14 @@ function onDesktopInput(ev) {
   if (!n || !R.can) return;
   // The same press that just set a key also arrives here a moment later: don't talk on it.
   if (ev.type === "down" && Date.now() - (R.capturedAt || 0) < 500) return;
-  if (ev.type === "down") { if (R.can.talk.includes(n)) startTalk(n); }
+  if (ev.type === "down") { if (canTalkNet(n)) startTalk(n); }
   else if (R.tx === n) stopTalk();
 }
 let deskPrefs = {};
 function desktopSetup() {
   document.body.classList.add("desktop");
   if (DESK.kit) { document.body.classList.add("kit"); document.documentElement.classList.add("kit"); } // v0.4+ app: the field kit look
+  if (DESK.kit && !DESK.overlayCmd) $("board-open").hidden = true; // older apps: use the fold-out tab
   $("notice-text").innerHTML = "<b>Desktop app.</b> Your talk keys work while the game is in front. Click a key box on a net to change it (Mouse 4/5 work too).";
   DESK.onInput(onDesktopInput);
   const apply = (p) => {
@@ -421,6 +441,18 @@ function desktopSetup() {
       if (cleared) { save(); render(); }
     }
     if (p.update) $("update-text").textContent = `Update ready (v${p.update}).`;
+    if (DESK.overlayCmd && p.overlayCorner !== undefined) {
+      $("ovl-row").hidden = false;
+      $("ovl-corner").value = p.overlayCorner;
+      $("ovl-custom").hidden = p.overlayCorner !== "custom";
+      $("ovl-move").textContent = p.overlayMoving ? "Done moving" : "Move it";
+      $("ovl-move").classList.toggle("wait", !!p.overlayMoving);
+      $("ovl-move-help").hidden = !p.overlayMoving;
+      if (document.activeElement !== $("ovl-size")) $("ovl-size").value = Math.round(p.overlayScale * 100);
+      if (document.activeElement !== $("ovl-see")) $("ovl-see").value = Math.round((1 - p.overlayOpacity) * 100);
+      $("ovl-size-val").textContent = `${$("ovl-size").value}%`;
+      $("ovl-see-val").textContent = `${$("ovl-see").value}%`;
+    }
   };
   DESK.getPrefs().then(apply).catch(() => {});
   DESK.onPrefs(apply);
@@ -432,6 +464,14 @@ function desktopSetup() {
     $("pda-open").onclick = () => DESK.pda(true);
     $("pda-key").onclick = () => DESK.setPdaKey();
   }
+  if (DESK.overlayCmd) { // v0.5+: put the overlay where you want it
+    $("ovl-corner").onchange = (e) => DESK.overlayCmd({ corner: e.target.value });
+    $("ovl-move").onclick = () => DESK.overlayCmd({ move: !deskPrefs.overlayMoving });
+    $("ovl-size").oninput = (e) => { $("ovl-size-val").textContent = `${e.target.value}%`; DESK.overlayCmd({ scale: e.target.value / 100 }); };
+    $("ovl-see").oninput = (e) => { $("ovl-see-val").textContent = `${e.target.value}%`; DESK.overlayCmd({ opacity: 1 - e.target.value / 100 }); };
+  }
+  // Older apps fold out the dadops.gg PDA; v0.5+ folds out the Battle Board.
+  if (DESK.overlayCmd) { $("pda-open").textContent = "Open Battle Board"; $("pda-key").title = "Change the Battle Board key"; }
   $("desk").hidden = false;
   $("last-key").hidden = false; showLastKey();
   $("desk").open = !DESK.kit;
@@ -451,7 +491,7 @@ function pushOverlay() {
     on: true, status,
     nets: Object.keys(R.nets).filter((n) => mine.includes(n)).map((n) => {
       const t = R.roster.find((p) => p.talking === n && p.conn !== R.conn);
-      return { key: n, short: R.nets[n].short, name: R.nets[n].name, talker: t ? t.callsign + (t.voice ? ` · ${t.voice.tag}` : "") : null, you: R.tx === n, alert: !R.nets[n].joinable };
+      return { key: n, short: R.nets[n].short, name: R.nets[n].name, talker: t ? withTag(t) : null, you: R.tx === n, alert: !R.nets[n].joinable };
     }),
   });
 }
@@ -569,8 +609,10 @@ function buildNets() {
 
 function alertIn(el, text) { const d = el.querySelector('[data-r="desc"]'); d.textContent = text; }
 
+const LEAD_ONLY = "Listen only. Take your fireteam's FTL seat to talk here. Sergeants and up can talk without one.";
+
 function render() {
-  if (!R.me) return;
+  if (!R.me || R.off) return;
   const me = R.me;
   $("tonight").textContent = me.tonight ? me.tonight.title : "No op on right now";
   const rank = RANKS[me.rank] || (me.level === "private" ? "Private +" : "Recruit");
@@ -584,7 +626,7 @@ function render() {
   for (const [key, { el, q }] of Object.entries(R.cards)) {
     const net = R.nets[key];
     const joined = mine.includes(key);
-    const canListen = R.can.listen.includes(key), canTalk = R.can.talk.includes(key);
+    const canListen = R.can.listen.includes(key), canTalk = canTalkNet(key);
     const monitoring = joined && myMonitor().includes(key), talkHere = canTalk && joined && !monitoring;
     const on = R.roster.filter((p) => p.nets.includes(key));
     const talker = on.find((p) => p.talking === key);
@@ -603,24 +645,28 @@ function render() {
     const desc = q("desc");
     if (!canListen) desc.textContent = `${net.name} opens at Private.`;
     else if (!joined) desc.textContent = net.desc || "";
+    else if (monitoring && !canTalk) desc.textContent = key === "command" ? LEAD_ONLY : "Listen only on this net.";
     else if (monitoring) desc.textContent = "Monitoring: you hear this net but can't talk on it. Switch to Talk to speak up.";
+    else if (!canTalk && key === "command") desc.textContent = LEAD_ONLY;
     else if (!net.joinable) desc.textContent = canTalk ? "You can talk to everyone on the radio. Use it sparingly." : (net.desc || "");
     else desc.textContent = "";
 
     const sp = q("speaking");
     if (talker && joined) {
       sp.hidden = false;
-      sp.innerHTML = talker.conn === R.conn ? `<b>You</b> are talking` : `<b>${esc(talker.callsign)}${talker.voice ? ` · ${esc(talker.voice.tag)}` : ""}</b> is talking`;
+      sp.innerHTML = talker.conn === R.conn ? `<b>You</b> are talking` : `<b>${esc(withTag(talker))}</b> is talking`;
     } else sp.hidden = true;
 
     q("people").innerHTML = joined ? on.map((p) => { const mon = (p.monitor || []).includes(key);
-      return `<span class="chip ${p.talking === key ? "on" : ""} ${mon ? "mon" : ""}" ${mon ? 'title="Monitoring (listen only)"' : ""}>${esc(p.callsign)}${p.voice ? ` · ${esc(p.voice.tag)}` : ""}${p.conn === R.conn ? " (you)" : ""}${mon ? " · listening" : ""}</span>`; }).join("") : "";
+      return `<span class="chip ${p.talking === key ? "on" : ""} ${mon ? "mon" : ""}" ${mon ? 'title="Monitoring (listen only)"' : ""}>${esc(withTag(p))}${p.conn === R.conn ? " (you)" : ""}${mon ? " · listening" : ""}</span>`; }).join("") : "";
     const mode = q("mode");
     if (mode) { mode.hidden = !(joined && canTalk); mode.querySelectorAll("[data-mode]").forEach((b) => b.setAttribute("aria-pressed", String((b.dataset.mode === "monitor") === monitoring))); }
     q("controls").hidden = !joined;
     el.querySelectorAll("[data-pan]").forEach((b) => b.setAttribute("aria-pressed", String(+b.dataset.pan === S(key).pan)));
     q("joinrow").hidden = joined || !canListen || !net.joinable;
     q("monitor").hidden = !canTalk;
+    q("join").textContent = canTalk ? "Join net" : "Listen in";
+    if (monitoring && !canTalk) keybox.innerHTML = '<span class="count">Listen only</span>';
     const ptt = q("ptt");
     ptt.hidden = !talkHere;
     ptt.classList.toggle("tx", R.tx === key);
@@ -629,11 +675,98 @@ function render() {
 
   const foot = document.querySelector(".foot");
   foot.classList.toggle("tx", !!R.tx);
-  const first = R.can.talk.find((n) => mine.includes(n) && !myMonitor().includes(n));
+  const first = Object.keys(R.nets).find((n) => canTalkHere(n));
   $("foot-text").textContent = !R.micTrack ? "Listen only" : R.tx ? `Talking on ${R.nets[R.tx].name}` :
     first ? `Hold ${keyLabel(S(first).key)} to talk on ${R.nets[first].name}` : "Join a net to talk";
+  renderSeats();
   mix();
   pushOverlay();
+  feedBoard();
 }
+
+// ---------- fireteams and FTL seats ----------
+// One FTL seat per Discord "Fireteam" channel. Anyone Private+ in that channel can take it;
+// tonight's Squad Leader and S3 can assign, change or clear seats. The seat holder talks on Command.
+function renderSeats() {
+  const box = $("fireteams"), seats = R.seats || [];
+  const sl = R.roster.find((p) => p.squadLeader);
+  if (!seats.length && !sl) { box.hidden = true; box.innerHTML = ""; return; }
+  // Don't rebuild under someone's open Assign dropdown.
+  if (box.contains(document.activeElement) && document.activeElement.tagName === "SELECT") return;
+  box.hidden = false;
+  const me = myEntry(), myCh = me && me.voice && me.voice.id;
+  const boss = R.me.staff || R.me.squadLeader, priv = R.me.level === "private";
+  box.innerHTML = `<div class="label pad nets-head"><span>FIRETEAMS</span><span class="klbl">${sl ? "Squad Leader: " + esc(sl.callsign) : "No Squad Leader on net"}</span></div>` +
+    seats.map((st) => {
+      const here = myCh === st.ch, mine = !!st.holder && st.holder.id === R.me.id;
+      const inCh = R.roster.filter((p) => p.voice && p.voice.id === st.ch && p.level === "private");
+      const talking = st.holder && R.roster.find((p) => p.id === st.holder.id && p.talking === "command");
+      let act = "";
+      if (mine) act = `<button class="ghost small" data-seat="release" data-ch="${esc(st.ch)}">Give up</button>`;
+      else if (!st.holder && here && priv) act = `<button class="join" data-seat="claim" data-ch="${esc(st.ch)}">Take FTL</button>`;
+      const pick = boss ? `<select class="ftpick" data-ch="${esc(st.ch)}" aria-label="Assign the ${esc(st.tag)} FTL seat"><option value="">${st.holder ? "Change…" : "Assign…"}</option>` +
+        inCh.filter((p) => !st.holder || p.id !== st.holder.id).map((p) => `<option value="${esc(p.conn)}">${esc(p.callsign)}</option>`).join("") +
+        (st.holder ? '<option value="__clear">Clear seat</option>' : "") + "</select>" : "";
+      const holder = st.holder ? `<b>${mine ? "You" : esc(st.holder.callsign)}</b>${st.holder.away ? ' <span class="muted">(away)</span>' : ""}` : '<span class="muted">open</span>';
+      return `<div class="ft${mine ? " mine" : ""}${here ? " here" : ""}${talking ? " live" : ""}"><span class="fttag">${esc(st.tag)}</span>` +
+        `<div class="grow"><div class="ftname">${esc(st.name)} · ${st.count} on Dad Net${here ? " · you're here" : ""}</div><div class="ftl">FTL: ${holder}</div></div>${act}${pick}</div>`;
+    }).join("") + (seats.length ? "" : '<p class="muted ftnone">Nobody is in a Fireteam channel in Discord yet.</p>');
+}
+async function seatCmd(op, ch, conn) {
+  try { const r = await ask({ t: "seat", op, ch, conn }); if (r.t === "error") flash(r.reason); } catch (e) { flash(e.message); }
+}
+$("fireteams").addEventListener("click", (e) => { const b = e.target.closest("[data-seat]"); if (b) seatCmd(b.dataset.seat, b.dataset.ch); });
+$("fireteams").addEventListener("change", (e) => {
+  const sel = e.target.closest(".ftpick"); if (!sel || !sel.value) return;
+  const v = sel.value; sel.blur();
+  if (v === "__clear") seatCmd("clear", sel.dataset.ch); else seatCmd("assign", sel.dataset.ch, v);
+});
+
+// ---------- going off net (the app and the Battle Board stay open) ----------
+function goOff() {
+  if (R.off) return;
+  R.off = true; R.stopping = true;
+  if (R.ws) R.ws.onclose = null;
+  for (const w of R.waiting.values()) w.fail(new Error("Off net."));
+  R.waiting.clear();
+  teardown();
+  R.roster = []; R.seats = [];
+  show("v-off");
+  if (DESK) DESK.overlay({ on: false, status: "Off net", nets: [] });
+  feedBoard();
+}
+function backOn() {
+  if (!R.off) return;
+  R.off = false; R.stopping = false;
+  $("backon").disabled = true;
+  connect().catch((e) => { show("v-ready"); $("ready-err").textContent = e.message || String(e); })
+    .finally(() => { $("backon").disabled = false; });
+}
+$("offnet").onclick = goOff;
+$("backon").onclick = backOn;
+
+// ---------- the Battle Board ----------
+// The board (board.html) is its own page: in the app it folds out beside the radio,
+// in a browser it opens in its own window. This page tells it what's going on.
+let boardChan = null;
+try { boardChan = new BroadcastChannel("dad-net"); boardChan.onmessage = (e) => { if (e.data && e.data.t === "hello") feedBoard(); }; } catch {}
+function feedBoard() {
+  if (!boardChan) return;
+  const st = R.off || !R.me ? { off: R.off, signedIn: !!R.me, callsign: R.me && R.me.callsign } : {
+    off: false, signedIn: true, status: $("status-text").textContent,
+    me: { id: R.me.id, callsign: R.me.callsign, rank: R.me.rank, staff: R.me.staff, squadLeader: R.me.squadLeader, level: R.me.level },
+    tonight: R.me.tonight, conn: R.conn, tx: R.tx,
+    nets: Object.fromEntries(Object.entries(R.nets).map(([k, n]) => [k, { name: n.name, short: n.short, key: canTalkNet(k) ? (S(k).key ? keyLabel(S(k).key) : "no key") : null }])),
+    roster: R.roster.map((p) => ({ id: p.id, conn: p.conn, callsign: p.callsign, rank: p.rank, squadLeader: p.squadLeader, staff: p.staff,
+      voice: p.voice, ftl: p.ftl, nets: p.nets, monitor: p.monitor, talking: p.talking })),
+    seats: R.seats,
+  };
+  try { boardChan.postMessage({ t: "state", state: st }); } catch {}
+}
+$("board-open").onclick = () => {
+  if (DESK && DESK.pda) return DESK.pda(true);
+  window.open("/board", "dadnet-board", "popup,width=1000,height=820");
+};
+if (DESK && DESK.onNetCmd) DESK.onNetCmd((c) => (c === "off" ? goOff() : backOn()));
 
 boot().catch((e) => { show("v-ready"); $("ready-err").textContent = "Couldn't load the radio: " + (e.message || e); });

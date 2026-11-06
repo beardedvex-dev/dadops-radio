@@ -1,4 +1,4 @@
-# DAD Ops Radio: setting up the browser test
+# Dad Net (DAD Ops Radio): setting up the browser test
 
 About 20–30 minutes, once. After this, every push in GitHub Desktop updates
 the radio by itself, the same way Vercel does for the website.
@@ -106,13 +106,51 @@ Leave the **Site URL** alone. It stays `https://dadops.gg`.
 | The microphone was blocked | Click the camera/mic icon in the address bar → Allow → reload |
 | A member says "Finish joining DAD Ops on dadops.gg first" | They haven't finished signing up on dadops.gg, or used a different Discord account |
 
+## Optional: show Discord channels (5 min)
+
+With this on, the radio shows which Discord voice channel everyone is in:
+your own channel at the top ("Discord: Fireteam 2 · Tactical") and a tag
+next to each person on a net ("Pickles · FT1"). It uses Maj. Horton, who's
+already in the server. Without these two settings the radio works the same,
+just without the tags.
+
+**1. The Rally Point's channel ID** (this is how the radio finds the server)
+- Discord → **User Settings** → **Advanced** → turn on **Developer Mode**.
+- Right-click **The Rally Point** voice channel → **Copy Channel ID**.
+
+**2. Horton's bot token**
+- It's the same `DISCORD_BOT_TOKEN` that's in Vercel. If Vercel won't show
+  it (it was saved as *Sensitive*), make a new one:
+  Discord Developer Portal → your bot → **Bot** → **Reset Token** → copy it.
+  Then put the new token in **Vercel** too (Settings → Environment Variables →
+  `DISCORD_BOT_TOKEN` → Edit) and **Redeploy**, or Horton goes quiet.
+
+**3. Add both to Cloudflare** (Workers & Pages → dadops-radio → Settings →
+Variables and Secrets → Add, type **Secret** for both):
+
+| Name | Value |
+|---|---|
+| `DISCORD_BOT_TOKEN` | the bot token |
+| `DISCORD_RALLY_POINT_ID` | The Rally Point's channel ID |
+
+Click **Deploy**. Within about 15 seconds of getting on net, tags show up.
+They follow people as they move channels (checked every 15 seconds).
+Channels named like "Fireteam 2" show as **FT2**; others show their name.
+
+The token is a password: never post it in Discord or chat.
+
 ## Who gets what
 
 | Who | Hears | Can talk on |
 |---|---|---|
 | Recruit | All-call | nothing (listen only) |
-| Private and up, plus S3, S6, Quartermasters, Armorers, Scouts, Founders (the same people the Private-only pages let in) | All-call, plus Command, Recon, Air Support and Logistics / Vehicles if they join them | those four |
-| S3, and whoever is **tonight's Squad Leader** on the ops board | same as above | All-call too |
+| Private and up, plus S3, S6, Quartermasters, Armorers, Scouts, Founders (the same people the Private-only pages let in) | All-call, plus Command, Recon, Air Support and Logistics / Vehicles if they join them | Recon, Air Support, Logistics. Command only while holding their fireteam's **FTL seat** |
+| Sergeant and up | same as above | Command too, no seat needed |
+| S3, and whoever is **tonight's Squad Leader** on the ops board | same as above | Command and All-call too. They can also assign, change and clear FTL seats |
 
 "Tonight's Squad Leader" is whoever is set as lead on an op that started in
 the last 5 hours or starts in the next 2.
+
+FTL seats come from Discord: one seat per voice channel with "Fireteam" and a
+number in its name (or "FT1", "FT2"...). They need the Discord bot settings
+above. Seats reset every op night at 6 AM Eastern.

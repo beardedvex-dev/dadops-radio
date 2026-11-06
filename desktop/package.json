@@ -1,8 +1,8 @@
 {
   "name": "dadops-radio-desktop",
   "productName": "DAD Ops Radio",
-  "version": "0.4.2",
-  "description": "DAD Ops Radio for Windows: talk keys that work in-game, plus an overlay",
+  "version": "0.5.0",
+  "description": "Dad Net for Windows: talk keys that work in-game, the overlay and the Battle Board",
   "author": "DAD Ops",
   "private": true,
   "main": "main.js",
@@ -21,7 +21,7 @@
   "build": {
     "appId": "gg.dadops.radio",
     "productName": "DAD Ops Radio",
-    "artifactName": "DAD-Ops-Radio-Setup-${version}.${ext}",
+    "artifactName": "Dad-Net-Setup-${version}.${ext}",
     "files": [
       "main.js",
       "keys.js",
@@ -48,7 +48,7 @@
       "perMachine": false,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "DAD Ops Radio",
+      "shortcutName": "Dad Net",
       "runAfterFinish": true
     },
     "publish": [

@@ -1,4 +1,4 @@
-# DAD Ops Radio desktop app: building and installing
+# Dad Net desktop app: building and installing
 
 The desktop app is a small Windows program around the same radio page you
 already use, plus:
@@ -70,14 +70,15 @@ one file goes in through the GitHub website:
    workflow**.
 3. Wait about 5–10 minutes for the green tick.
 4. Go to the repo's **Releases** (right side of the repo's main page). The new
-   release has **DAD-Ops-Radio-Setup-0.1.0.exe**.
+   release has the installer (**Dad-Net-Setup-x.y.z.exe** from v0.5.0; older
+   ones are called DAD-Ops-Radio-Setup).
 
 Each build needs a new version number. Claude bumps it in
 `desktop\package.json` whenever the app changes, and tells you.
 
 ## Installing
 
-1. Download **DAD-Ops-Radio-Setup-x.y.z.exe** from Releases and run it.
+1. Download **Dad-Net-Setup-x.y.z.exe** from Releases (or radio.dadops.gg) and run it.
 2. Windows will probably say **"Windows protected your PC"**, because the app
    isn't code-signed yet. Click **More info** → **Run anyway**.
 3. It installs and opens. Sign in with Discord in the window that appears.
@@ -97,15 +98,18 @@ Each build needs a new version number. Claude bumps it in
   can draw over exclusive Fullscreen. Most games call it "Borderless",
   "Windowed Fullscreen" or "Fullscreen (Windowed)".
 
-## The field kit (from v0.4.0)
+## The field kit (from v0.4.0; Battle Board from v0.5.0)
 
-The app is one rugged "field kit" built like the Field PDA. The radio is on
-the left, and the **Field PDA** (dadops.gg/pda) folds out to the right.
+The app is one rugged "field kit". The radio is on the left, and the
+**Battle Board** folds out to the right (up to v0.4.2 this was the dadops.gg
+Field PDA; the PDA now stays on the website, linked at the bottom of the board).
 
-- **Folded:** just the radio. Click the **FIELD PDA ▸** tab sticking out of
-  the right edge to fold the PDA out.
-- **Unfolded:** radio + Field PDA. Click **◂ FOLD** on the hinge to fold it
-  away.
+- **Folded:** just the radio. Click the **BATTLE BOARD ▸** tab sticking out of
+  the right edge to fold the board out.
+- **Unfolded:** radio + Battle Board: tonight's op and countdown, the squad
+  board (fireteams, FTLs, who's where), your comms, a stopwatch, a countdown
+  that beeps, and a notepad (saved on this PC). Click **◂ FOLD** on the hinge
+  to fold it away.
 - **F9 anywhere, even in-game:** pops the whole kit up unfolded, on top of
   the game. Press F9 again to tuck it away. The radio stays on net the whole
   time; your talk keys keep working while it's open.
@@ -115,8 +119,22 @@ the left, and the **Field PDA** (dadops.gg/pda) folds out to the right.
   → **Show/hide key**. If a net was using that key, the net gives it up.
 - Closed net cards stay compact. Click **▾** on a joined net to see who's on
   it and the ear/volume controls; a net with someone talking opens by itself.
-- The first time, sign in to dadops.gg in the PDA side (same Discord).
-- It remembers whether the PDA was folded out, plus its size and position.
+- **Go off net** (on the radio, or right-click the tray icon) leaves every
+  net but keeps the app and the Battle Board open. **Get back on net** puts
+  you back. Restarting the app always starts on net.
+- It remembers whether the board was folded out, plus its size and position.
+
+## Moving the overlay (from v0.5.0)
+
+Open **Desktop app** at the bottom of the radio:
+- **Overlay spot:** pick a corner (top/bottom, left/right). The rows grow
+  away from the edge it sits on.
+- **Move it:** the overlay gets a tan bar that says DRAG ME. Drag it anywhere
+  (over the game is fine), then click **Done** on the overlay or **Done
+  moving** in the radio. The spot changes to "Where I dragged it". Also in
+  the tray menu: **Move the overlay**.
+- **Size:** 70% to 160%. **See-through:** 0% to 60%.
+All of it is remembered.
 
 ## Updating
 
@@ -129,11 +147,11 @@ updates on the way out.
 
 Quickest test on your own:
 1. Open the app on your PC and the browser version on your phone, both signed
-   in as you, and join Command on both.
-2. Set Command to Mouse 5 in the app.
+   in as you, and join Recon on both (Command needs an FTL seat or Sergeant+).
+2. Set Recon to Mouse 5 in the app.
 3. Start WARDOGS in borderless, hold Mouse 5 and talk: your phone plays it,
-   and the overlay shows **TX · COMMAND** while you hold it.
-4. Talk on your phone: the overlay shows you talking on **CMD**.
+   and the overlay shows **TX · RECON** while you hold it.
+4. Talk on your phone: the overlay shows you talking on **RCN**.
 
 ## If something's off
 

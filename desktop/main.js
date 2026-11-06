@@ -1,12 +1,13 @@
 // =====================================================================
-//  DAD Ops Radio - desktop app (Windows)
+//  Dad Net - desktop app (Windows)
 //
-//  One "field kit" window built like the Field PDA: a rugged chassis
-//  (shell.html) with two separate pages inside it:
+//  One "field kit" window: a rugged chassis (shell.html) with two separate
+//  pages inside it:
 //    * the radio page (the same one that runs in the browser), always on
-//    * the Field PDA (dadops.gg/pda), folded out to the right on demand
-//  They are separate pages side by side, so nothing the PDA does can drop
-//  you off the radio.
+//    * the Battle Board (board.html on the radio's own address), folded out
+//      to the right on demand: tonight's op, the squad board, timers, notes
+//  They are separate pages side by side, so nothing the board does can drop
+//  you off the radio. The radio page tells the board what's going on.
 //
 //  Plus the things a browser can't do:
 //    1. Talk keys that work while the game has focus (keyboard and mouse
@@ -24,12 +25,11 @@ const { keyFromHook, buttonFromHook } = require("./keys");
 const CONFIG = JSON.parse(fs.readFileSync(path.join(__dirname, "config.json"), "utf8"));
 const RADIO_URL = (process.env.DADOPS_RADIO_URL || CONFIG.radioUrl).replace(/\/+$/, "");
 const RADIO_ORIGIN = new URL(RADIO_URL).origin;
-const PDA_URL = process.env.DADOPS_PDA_URL || CONFIG.pdaUrl || "https://dadops.gg/pda";
-const PDA_ORIGIN = new URL(PDA_URL).origin;
+const BOARD_URL = RADIO_URL + "/board?kit=1";
 const ICON = path.join(__dirname, "build", "icon.png");
 
 // Sign-in passes through Discord and Supabase; everything else opens in the real browser.
-const ALLOWED = [RADIO_ORIGIN, PDA_ORIGIN, "https://discord.com", "https://canary.discord.com", "https://ptb.discord.com"];
+const ALLOWED = [RADIO_ORIGIN, "https://discord.com", "https://canary.discord.com", "https://ptb.discord.com"];
 const allowed = (url) => {
   try { const u = new URL(url); return ALLOWED.includes(u.origin) || /\.supabase\.co$/.test(u.hostname); } catch { return false; }
 };
@@ -46,14 +46,15 @@ if (!app.requestSingleInstanceLock()) { app.quit(); }
 
 // ---------- saved settings ----------
 const PREFS_FILE = () => path.join(app.getPath("userData"), "prefs.json");
-let prefs = { overlay: true, startWithWindows: false, pdaKey: { code: "F9" }, unfolded: false, openWidth: 1560, kitBounds: null };
+let prefs = { overlay: true, startWithWindows: false, pdaKey: { code: "F9" }, unfolded: false, openWidth: 1560, kitBounds: null,
+  overlayCorner: "tl", overlayX: null, overlayY: null, overlayScale: 1, overlayOpacity: 1 };
 function loadPrefs() { try { prefs = { ...prefs, ...JSON.parse(fs.readFileSync(PREFS_FILE(), "utf8")) }; } catch {} }
 function savePrefs() { try { fs.writeFileSync(PREFS_FILE(), JSON.stringify(prefs, null, 2)); } catch {} }
 
 let updState = "", checkNow = null;
 let hookState = "starting", hookLast = 0; // the in-game key listener: starting / running / failed
 let kit = null, shellView = null, radioView = null, pdaView = null, overlay = null, tray = null;
-let quitting = false, lastOverlay = null, update = null, capturingPda = false, unfolded = false, overGame = false;
+let quitting = false, lastOverlay = null, update = null, capturingPda = false, unfolded = false, overGame = false, ovMoving = false;
 
 // ---------- the field kit window ----------
 // Chassis sizes (match shell.html): outer margin, rim, screen padding, status strip.
@@ -76,7 +77,7 @@ function createKit(startHidden) {
   const b = prefs.kitBounds || {};
   kit = new BaseWindow({
     width: FOLDED_W, height: Math.min(b.height || 880, wa.height), x: b.x, y: b.y,
-    minWidth: 420, minHeight: MIN_H, frame: false, title: "DAD Ops Radio", icon: ICON,
+    minWidth: 420, minHeight: MIN_H, frame: false, title: "Dad Net", icon: ICON,
     backgroundColor: "#1a1914", show: false,
   });
 
@@ -134,22 +135,17 @@ function layout() {
   shellView.webContents.send("kit:layout", { W, H, unfolded, chassis, screen: scr, status, hinge, tab, pdaKey: keyName(prefs.pdaKey) });
 }
 
-// The PDA's own chassis and the cells the radio already shows are hidden inside the kit.
-const PDA_KIT_CSS = `
-  body.pda-page{background:#0f0f0b!important}
-  .pda-desk{padding:0!important;background:#0f0f0b!important;min-height:100vh!important}
-  .pda{height:100vh!important;max-width:none!important;min-height:0!important;border-radius:0!important;padding:0!important;background:transparent!important;box-shadow:none!important}
-  .pda::before,.pda-screw,.pda-brand,.pda-who,.pda-win,.pda-status{display:none!important}
-  .pda-screen{border:0!important;border-radius:0!important;padding:0!important;background:transparent!important}
-`;
+// The Battle Board (called pdaView here: it sits where the Field PDA used to).
 function ensurePda() {
   if (pdaView) return;
-  pdaView = new WebContentsView({ webPreferences: { contextIsolation: true, sandbox: true } });
+  pdaView = new WebContentsView({ webPreferences: { contextIsolation: true, sandbox: true, backgroundThrottling: false } });
   pdaView.setBackgroundColor("#0f0f0b");
   kit.contentView.addChildView(pdaView);
-  pdaView.webContents.on("dom-ready", () => { if (pdaView.webContents.getURL().startsWith(PDA_ORIGIN)) pdaView.webContents.insertCSS(PDA_KIT_CSS); });
-  guard(pdaView.webContents, PDA_ORIGIN);
-  pdaView.webContents.loadURL(PDA_URL);
+  guard(pdaView.webContents, RADIO_ORIGIN);
+  pdaView.webContents.loadURL(BOARD_URL);
+  pdaView.webContents.on("did-fail-load", (_e, code, _d, _u, isMain) => {
+    if (isMain && code !== -3) setTimeout(() => pdaView && pdaView.webContents.loadURL(BOARD_URL), 5000);
+  });
 }
 
 function setUnfolded(open) {
@@ -204,10 +200,49 @@ function sendStatus() {
 }
 
 // ---------- the in-game overlay ----------
+// Where it sits: a corner of the main screen, or wherever it was dragged ("custom").
+// Size zooms the whole overlay; see-through fades it. Move mode makes it clickable
+// so it can be dragged by its top bar, then Done puts it back to click-through.
+const OV_W = 320, OV_H = 300, OV_M = 16;
+function overlayBox() {
+  const sc = Math.min(1.6, Math.max(0.7, +prefs.overlayScale || 1));
+  const w = Math.round(OV_W * sc), h = Math.round(OV_H * sc);
+  let d = screen.getPrimaryDisplay().workArea, x, y;
+  const c = prefs.overlayCorner;
+  if (c === "custom" && Number.isFinite(prefs.overlayX) && Number.isFinite(prefs.overlayY)) {
+    d = screen.getDisplayNearestPoint({ x: prefs.overlayX + Math.round(w / 2), y: prefs.overlayY + 10 }).workArea;
+    x = Math.min(Math.max(prefs.overlayX, d.x), d.x + d.width - w);
+    y = Math.min(Math.max(prefs.overlayY, d.y), d.y + d.height - h);
+  } else {
+    x = /r$/.test(c) ? d.x + d.width - w - OV_M : d.x + OV_M;
+    y = /^b/.test(c) ? d.y + d.height - h - OV_M : d.y + OV_M;
+  }
+  // Which way the rows grow: away from the nearest screen edges.
+  const right = x + w / 2 > d.x + d.width / 2, bottom = y + h / 2 > d.y + d.height / 2;
+  return { x, y, width: w, height: h, scale: sc, anchor: { h: right ? "right" : "left", v: bottom ? "bottom" : "top" } };
+}
+function placeOverlay() {
+  if (!overlay || overlay.isDestroyed()) return;
+  const b = overlayBox();
+  overlay.setBounds({ x: b.x, y: b.y, width: b.width, height: b.height });
+  overlay.webContents.setZoomFactor(b.scale);
+  overlay.setOpacity(Math.min(1, Math.max(0.4, +prefs.overlayOpacity || 1)));
+  overlay.webContents.send("dadops:overlay-mode", { anchor: b.anchor, moving: ovMoving });
+}
+function setOverlayMoving(on) {
+  ovMoving = !!on;
+  if (!overlay || overlay.isDestroyed()) return;
+  overlay.setIgnoreMouseEvents(!ovMoving);
+  overlay.setFocusable(ovMoving);
+  overlay.setMovable(ovMoving);
+  placeOverlay();
+  showOverlay();
+  sendPrefs();
+}
 function createOverlay() {
   const d = screen.getPrimaryDisplay().workArea;
   overlay = new BrowserWindow({
-    x: d.x + 16, y: d.y + 16, width: 320, height: 300,
+    x: d.x + OV_M, y: d.y + OV_M, width: OV_W, height: OV_H,
     frame: false, transparent: true, resizable: false, movable: false, focusable: false, skipTaskbar: true,
     alwaysOnTop: true, hasShadow: false, show: false,
     webPreferences: { preload: path.join(__dirname, "overlay-preload.js"), contextIsolation: true, sandbox: true, backgroundThrottling: false },
@@ -217,10 +252,19 @@ function createOverlay() {
   overlay.setVisibleOnAllWorkspaces(true);
   overlay.loadFile(path.join(__dirname, "overlay.html"));
   overlay.webContents.on("will-navigate", (e) => e.preventDefault());
+  overlay.webContents.on("did-finish-load", () => { placeOverlay(); showOverlay(); });
+  // Dragged in move mode: remember exactly where.
+  overlay.on("moved", () => {
+    if (!ovMoving) return;
+    const b = overlay.getBounds();
+    prefs.overlayCorner = "custom"; prefs.overlayX = b.x; prefs.overlayY = b.y; savePrefs();
+    placeOverlay(); sendPrefs();
+  });
+  screen.on("display-metrics-changed", placeOverlay);
 }
 function showOverlay() {
   if (!overlay || overlay.isDestroyed()) return;
-  const want = prefs.overlay && lastOverlay && lastOverlay.on;
+  const want = ovMoving || (prefs.overlay && lastOverlay && lastOverlay.on);
   if (want && !overlay.isVisible()) overlay.showInactive();
   if (!want && overlay.isVisible()) overlay.hide();
   if (lastOverlay) overlay.webContents.send("dadops:overlay-state", lastOverlay);
@@ -234,12 +278,15 @@ function applyStartWithWindows() {
 
 function buildTray() {
   tray = new Tray(nativeImage.createFromPath(ICON).resize({ width: 16, height: 16 }));
-  tray.setToolTip("DAD Ops Radio");
+  tray.setToolTip("Dad Net");
+  const offNet = () => !!(lastOverlay && lastOverlay.status === "Off net");
   const menu = () => Menu.buildFromTemplate([
-    { label: "Open DAD Ops Radio", click: () => showKit({}) },
-    { label: `Field PDA (${keyName(prefs.pdaKey)})`, click: () => showKit({ unfold: true }) },
+    { label: "Open Dad Net", click: () => showKit({}) },
+    { label: `Battle Board (${keyName(prefs.pdaKey)})`, click: () => showKit({ unfold: true }) },
+    { label: offNet() ? "Get back on net" : "Go off net", click: () => netCmd(offNet() ? "on" : "off") },
     { type: "separator" },
     { label: "Show overlay in-game", type: "checkbox", checked: prefs.overlay, click: (m) => { prefs.overlay = m.checked; savePrefs(); showOverlay(); sendPrefs(); } },
+    { label: ovMoving ? "Done moving the overlay" : "Move the overlay", click: () => setOverlayMoving(!ovMoving) },
     { label: "Start with Windows", type: "checkbox", checked: prefs.startWithWindows, click: (m) => { prefs.startWithWindows = m.checked; savePrefs(); applyStartWithWindows(); sendPrefs(); } },
     { type: "separator" },
     update ? { label: `Restart to update (v${update})`, click: () => installUpdate() } : { label: "Check for updates", enabled: !!checkNow, click: () => checkNow && checkNow() },
@@ -249,10 +296,14 @@ function buildTray() {
   tray.setContextMenu(menu());
   tray.on("click", () => showKit({}));
   tray.refresh = () => tray.setContextMenu(menu());
+  tray.items = () => menu().items;
+  tray.labels = () => menu().items.map((i) => i.label).filter(Boolean);
 }
 
+function netCmd(c) { if (radioView) radioView.webContents.send("dadops:netcmd", c); }
 function publicPrefs() {
   return { overlay: prefs.overlay, startWithWindows: prefs.startWithWindows, pdaKey: prefs.pdaKey, capturingPda, unfolded,
+    overlayCorner: prefs.overlayCorner, overlayScale: prefs.overlayScale, overlayOpacity: prefs.overlayOpacity, overlayMoving: ovMoving,
     version: app.getVersion(), update, updState, canCheck: !!checkNow, hookState, hookLast };
 }
 function keyName(k) {
@@ -296,6 +347,11 @@ function startHook() {
     global.__kitState = () => ({ visible: kit.isVisible(), unfolded, onTop: kit.isAlwaysOnTop(), width: kit.getBounds().width, pda: !!pdaView });
     global.__kitShow = () => showKit({});
     global.__kitMin = () => kit.isMinimized() || process.platform === "linux"; // Xvfb has no taskbar to minimize to
+    global.__ovl = () => ({ bounds: overlay.getBounds(), opacity: overlay.getOpacity(), zoom: overlay.webContents.getZoomFactor(), moving: ovMoving, visible: overlay.isVisible(), focusable: overlay.isFocusable() });
+    global.__ovlDrag = (x, y) => { overlay.setPosition(x, y); overlay.emit("moved"); };
+    global.__netCmd = netCmd;
+    global.__trayLabels = () => tray.labels();
+    global.__trayClick = (label) => { const it = tray.items().find((i) => i.label === label); if (it) it.click(it); return !!it; };
   }
   try { hook.start(); hookState = "running"; } catch (e) { console.error("Global keys failed to start:", e.message); hookState = "failed: " + e.message; }
   sendPrefs();
@@ -328,10 +384,22 @@ function installUpdate() {
 // ---------- messages from the radio page ----------
 ipcMain.on("dadops:overlay", (e, state) => {
   if (!fromRadio(e) || !state || typeof state !== "object") return;
+  const wasOff = lastOverlay && lastOverlay.status === "Off net";
   lastOverlay = state;
   showOverlay();
   sendStatus();
+  if (wasOff !== (state.status === "Off net") && tray && tray.refresh) tray.refresh(); // swap the tray's Go off net / Get back on net
 });
+ipcMain.on("dadops:overlay-set", (e, o) => {
+  if (!fromRadio(e) || !o || typeof o !== "object") return;
+  if (["tl", "tr", "bl", "br"].includes(o.corner)) prefs.overlayCorner = o.corner;
+  if (o.corner === "custom" && Number.isFinite(prefs.overlayX)) prefs.overlayCorner = "custom";
+  if (Number.isFinite(o.scale)) prefs.overlayScale = Math.min(1.6, Math.max(0.7, o.scale));
+  if (Number.isFinite(o.opacity)) prefs.overlayOpacity = Math.min(1, Math.max(0.4, o.opacity));
+  savePrefs();
+  if ("move" in o) setOverlayMoving(!!o.move); else { placeOverlay(); sendPrefs(); }
+});
+ipcMain.on("dadops:overlay-done", (e) => { if (overlay && e.sender === overlay.webContents) setOverlayMoving(false); });
 ipcMain.handle("dadops:prefs:get", (e) => (fromRadio(e) ? publicPrefs() : null));
 ipcMain.handle("dadops:prefs:set", (e, p) => {
   if (!fromRadio(e) || !p || typeof p !== "object") return null;

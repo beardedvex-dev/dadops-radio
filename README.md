@@ -1,4 +1,6 @@
-# DAD Ops Radio
+# Dad Net
+
+DAD Ops' own radio (it used to be called DAD Ops Radio; the repo keeps its old name).
 
 Extra voice nets on top of Discord, so fireteam leads can reach each other
 without swapping channels. Fireteams keep talking in their Discord channels
@@ -6,11 +8,25 @@ as normal. The radio adds:
 
 | Net | Who | Notes |
 |---|---|---|
-| **Command** | Private and up | Fireteam leads talking to each other. Left ear by default |
+| **Command** | Talk: whoever holds a fireteam's **FTL seat**, Sergeants and up, tonight's Squad Leader and S3. Listen: Private and up | Fireteam leads talking to each other. Left ear by default |
 | **Recon** | Private and up | Scouts and snipers. Right ear by default |
 | **Air Support** | Private and up | Heli pilots and air support. Right ear by default |
 | **Logistics / Vehicles** | Private and up | Drivers and supply runs. Right ear by default |
 | **All-call** | Everyone listens; S3 and tonight's Squad Leader talk | Both ears, chirp first |
+
+**FTL seats:** fireteams stay in Discord. Each Discord "Fireteam N" channel
+gets one FTL seat on Dad Net. Anyone Private+ in that channel can click
+**Take FTL**; it puts them on Command in Talk mode. Tonight's Squad Leader and
+S3 can assign, change or clear seats. A seat frees itself about a minute after
+its FTL leaves that Discord channel (or Dad Net), and all seats reset each op
+night (6 AM Eastern). This needs the Discord bot set up (SETUP.md).
+
+**Battle Board:** Dad Net's own tactical screen (`public/board.html`):
+tonight's op with a muster/step-off countdown, the squad board (fireteams,
+FTLs, who's in which channel and on which net, who's talking), your comms and
+keys, a stopwatch and countdown, and a notepad saved on that computer. In the
+app it folds out of the field kit (F9); in a browser, the **Battle Board**
+button opens it in its own window. The Field PDA stays on dadops.gg.
 
 **Status:** the browser version is live. The **desktop app** (talk keys that
 work while the game has focus, Mouse 4/5, the overlay, tray, start with
@@ -46,13 +62,14 @@ Test night: [TEST-NIGHT.md](TEST-NIGHT.md).
 |---|---|
 | `wrangler.jsonc` | Cloudflare settings (public values only) |
 | `src/worker.js` | The Worker and the switchboard |
-| `public/index.html`, `radio.js`, `radio.css`, `patch.png` | The test page |
+| `public/index.html`, `radio.js`, `radio.css`, `patch.png` | The radio page |
+| `public/board.html`, `board.js`, `board.css` | The Battle Board (gets its info from the radio page through the browser, never connects by itself) |
 | `SETUP.md` | One-time setup steps |
 | `TEST-NIGHT.md` | Checklist for the first test with the crew |
-| `desktop/` | The Windows app (Electron): `main.js` window/tray/keys/overlay/updates, `keys.js`, `preload.js`, `overlay.html`/`overlay.js`, `config.json` (the radio address) |
+| `desktop/` | The Windows app (Electron): `main.js` window/tray/keys/overlay/updates, `shell.html`/`shell.js` the field kit chassis, `keys.js`, `preload.js`, `overlay.html`/`overlay.js`, `config.json` (the radio address) |
 | `.github/workflows/desktop.yml` | Builds the installer on GitHub (Actions → Build desktop app → Run workflow). A copy to paste in is `desktop/build-workflow.yml` |
 | `DESKTOP.md` | Building, installing and using the desktop app |
-| `site/` | radio.dadops.gg, the radio's home page (own Vercel project). Steps: `HOME-PAGE.md` |
+| `site/` | radio.dadops.gg, Dad Net's home page (own Vercel project). Steps: `HOME-PAGE.md` |
 
 **Adding or changing a net:** edit the `NETS` list at the top of
 `src/worker.js` (copy a line, change the key, name, short tag and

@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Battle Board · Dad Net</title>
+<meta name="robots" content="noindex">
+<link rel="icon" type="image/png" href="/patch.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Big+Shoulders+Display:wght@600;800&family=Black+Ops+One&family=IBM+Plex+Mono:wght@500;600&display=swap">
+<link rel="stylesheet" href="/board.css">
+</head>
+<body>
+<main class="board">
+  <header class="top">
+    <span class="ring" aria-hidden="true">DAD</span>
+    <div class="topname"><b>BATTLE BOARD</b><small id="who">Dad Net</small></div>
+    <span class="grow"></span>
+    <div class="cell"><span class="lbl">Dad Net</span><b id="net-state">LOOKING…</b></div>
+    <div class="cell"><span class="lbl">Eastern</span><b id="clock-et">--:--</b></div>
+  </header>
+
+  <p class="banner" id="banner" hidden></p>
+
+  <div class="grid">
+    <!-- Tonight's op -->
+    <section class="card op" aria-labelledby="h-op">
+      <h2 id="h-op">TONIGHT'S OP</h2>
+      <div class="optitle" id="op-title">No op on right now</div>
+      <p class="opdetails" id="op-details"></p>
+      <div class="oprow">
+        <div class="big"><span class="lbl" id="op-count-lbl">Next up</span><b id="op-count">--</b></div>
+        <div class="big"><span class="lbl">Starts</span><b id="op-start">--</b></div>
+      </div>
+      <p class="muted" id="op-note">Muster in The Rally Point 15 minutes early.</p>
+    </section>
+
+    <!-- Squad board -->
+    <section class="card squad" aria-labelledby="h-squad">
+      <h2 id="h-squad">SQUAD BOARD</h2>
+      <div class="slline" id="sl-line">Squad Leader: <b>none on Dad Net</b></div>
+      <div id="teams"></div>
+      <div id="others"></div>
+    </section>
+
+    <!-- Comms -->
+    <section class="card comms" aria-labelledby="h-comms">
+      <h2 id="h-comms">COMMS</h2>
+      <div id="comms"><p class="muted">Get on net to see your nets and keys.</p></div>
+    </section>
+
+    <!-- Timers -->
+    <section class="card timers" aria-labelledby="h-timers">
+      <h2 id="h-timers">TIMERS</h2>
+      <div class="timer">
+        <div class="tline"><span class="lbl">Stopwatch</span><b id="sw">0:00</b></div>
+        <div class="btns">
+          <button id="sw-go">Start</button><button id="sw-reset" class="ghost">Reset</button>
+          <button id="sw-mark" class="ghost" title="Write the stopwatch time into your notes">Mark in notes</button>
+        </div>
+      </div>
+      <div class="timer" id="cd-box">
+        <div class="tline"><span class="lbl">Countdown</span><b id="cd">0:00</b></div>
+        <div class="btns">
+          <button data-cd="60" class="ghost">1m</button><button data-cd="180" class="ghost">3m</button>
+          <button data-cd="300" class="ghost">5m</button><button data-cd="600" class="ghost">10m</button>
+          <button data-cd="900" class="ghost">15m</button>
+          <button id="cd-stop" class="ghost">Stop</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Notepad -->
+    <section class="card notes" aria-labelledby="h-notes">
+      <h2 id="h-notes">NOTEPAD <span class="lbl" id="notes-saved"></span></h2>
+      <textarea id="notes" spellcheck="false" placeholder="Grids, callouts, who's on what, the plan... Saved on this computer as you type."></textarea>
+      <div class="btns">
+        <button id="n-stamp" class="ghost" title="Add the time to your notes">Time stamp</button>
+        <button id="n-copy" class="ghost">Copy</button>
+        <span class="grow"></span>
+        <button id="n-clear" class="ghost">Clear</button>
+      </div>
+    </section>
+  </div>
+
+  <footer class="foot">
+    <span>LIMITED AVAILABILITY</span>
+    <a href="https://dadops.gg/pda" target="_blank" rel="noopener">Full Field PDA on dadops.gg ↗</a>
+  </footer>
+</main>
+<script src="/board.js"></script>
+</body>
+</html>
