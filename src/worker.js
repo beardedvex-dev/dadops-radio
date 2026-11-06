@@ -196,10 +196,7 @@ export class Radio {
         if (!r.ok) return;
         this.guildId = (await r.json()).guild_id;
       }
-      if (!this.chanNames || Date.now() - this.chanAt > 10 * 60e3) {
-        const r = await this.discord(`/guilds/${this.guildId}/channels`);
-        if (r.ok) { this.chanNames = new Map((await r.json()).map((c) => [String(c.id), c.name])); this.chanAt = Date.now(); }
-      }
+      await this.loadChannels(false);
     } catch { return; }
     let changed = false;
     for (let i = 0; i < people.length; i += 5) { // a few at a time to stay friendly with Discord
@@ -210,6 +207,8 @@ export class Radio {
           if (r.status === 404) voice = null;
           else if (r.ok) {
             const j = await r.json();
+            // A channel we haven't seen yet (Horton just made tonight's team channels): look again.
+            if (j.channel_id && !(this.chanNames && this.chanNames.has(String(j.channel_id)))) await this.loadChannels(true).catch(() => {});
             const name = j.channel_id ? (this.chanNames && this.chanNames.get(String(j.channel_id))) || "Voice" : null;
             voice = name ? { id: String(j.channel_id), name, tag: voiceTag(name) } : null;
           }
@@ -221,6 +220,23 @@ export class Radio {
     if (changed) this.pushRoster();
   }
 
+  // The server's channels: names, plus which voice channels count as a team.
+  // Cached 10 minutes; 'soon' looks again after a minute (for brand-new channels).
+  async loadChannels(soon) {
+    const age = Date.now() - (this.chanAt || 0);
+    if (this.chanNames && age < (soon ? 60e3 : 10 * 60e3)) return;
+    const r = await this.discord(`/guilds/${this.guildId}/channels`);
+    if (!r.ok) return;
+    const list = await r.json();
+    this.chanAt = Date.now();
+    this.chanNames = new Map(list.map((c) => [String(c.id), c.name]));
+    this.chanInfo = new Map(list.map((c) => [String(c.id), { type: c.type, parent: c.parent_id ? String(c.parent_id) : null, position: Number(c.position) || 0 }]));
+    if (!this.afkId || age > 10 * 60e3) {
+      const g = await this.discord(`/guilds/${this.guildId}`).catch(() => null);
+      if (g && g.ok) this.afkId = String((await g.json()).afk_channel_id || "");
+    }
+  }
+
   // ---------- FTL seats ----------
   seats() {
     if (this.seatState.day !== opDay()) { this.seatState = { day: opDay(), list: {} }; this.saveSeats(); } // fresh every op night
@@ -228,7 +244,20 @@ export class Radio {
   }
   saveSeats() { this.ctx.waitUntil(this.ctx.storage.put("seats", this.seatState)); }
   seatOf(userId) { const l = this.seats(); return Object.keys(l).find((ch) => l[ch].userId === userId) || null; }
-  isFireteam(ch) { const n = this.chanNames && this.chanNames.get(String(ch)); return !!n && /^FT\d+$/.test(voiceTag(n)); }
+  // A team channel: any voice channel in The Rally Point's category (Horton's
+  // tonight's channels like "⚔️ Assault 1" or "🍺 FOB Crew 2", Alpha Squad...),
+  // except The Rally Point itself and the AFK channel; or anything named
+  // "Fireteam 2" / "FT2", wherever it is.
+  isFireteam(ch) {
+    ch = String(ch);
+    const n = this.chanNames && this.chanNames.get(ch);
+    if (!n) return false;
+    const rally = String(this.env.DISCORD_RALLY_POINT_ID || "");
+    if (ch === rally || ch === this.afkId || /kids\s*woke|back\s*booth|\bafk\b/i.test(n)) return false;
+    if (/^FT\d+$/.test(voiceTag(n))) return true;
+    const info = this.chanInfo && this.chanInfo.get(ch), home = this.chanInfo && this.chanInfo.get(rally);
+    return !!(info && home && home.parent && info.type === 2 && info.parent === home.parent);
+  }
   canTalk(a, net) {
     if (a.can.talk.includes(net)) return true;
     return net === "command" && a.me.level === "private" && !!this.seatOf(a.me.id);
@@ -280,8 +309,10 @@ export class Radio {
     const l = this.seats(), ms = this.members();
     const chans = new Set(Object.keys(l));
     for (const { a } of ms) if (a.voice && a.voice.id && this.isFireteam(a.voice.id)) chans.add(a.voice.id);
-    const num = (ch) => +((/\d+/.exec(voiceTag(this.chanNames && this.chanNames.get(ch))) || [999])[0]);
-    return [...chans].sort((x, y) => num(x) - num(y)).map((ch) => {
+    // In the order Discord lists them.
+    const pos = (ch) => { const i = this.chanInfo && this.chanInfo.get(ch); return i ? i.position : 9999; };
+    const name = (ch) => (this.chanNames && this.chanNames.get(ch)) || "";
+    return [...chans].sort((x, y) => pos(x) - pos(y) || name(x).localeCompare(name(y), "en", { numeric: true })).map((ch) => {
       const name = (this.chanNames && this.chanNames.get(ch)) || "Fireteam";
       const seat = l[ch];
       const holder = seat ? ms.find(({ a }) => a.me.id === seat.userId) : null;

@@ -151,6 +151,9 @@ The token is a password: never post it in Discord or chat.
 "Tonight's Squad Leader" is whoever is set as lead on an op that started in
 the last 5 hours or starts in the next 2.
 
-FTL seats come from Discord: one seat per voice channel with "Fireteam" and a
-number in its name (or "FT1", "FT2"...). They need the Discord bot settings
-above. Seats reset every op night at 6 AM Eastern.
+FTL seats come from Discord: one seat per team channel. A team channel is any
+voice channel in the same category as The Rally Point (Horton's op-night
+channels like "⚔️ Assault 1", squad channels), except The Rally Point itself
+and the server's AFK channel (Kids Woke Up), plus any channel named
+"Fireteam 2" or "FT2" wherever it is. The bot needs **View Channel** on them
+(it already has it for /fireteams). They need the Discord bot settings above. Seats reset every op night at 6 AM Eastern.

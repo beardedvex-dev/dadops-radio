@@ -14,8 +14,10 @@ as normal. The radio adds:
 | **Logistics / Vehicles** | Private and up | Drivers and supply runs. Right ear by default |
 | **All-call** | Everyone listens; S3 and tonight's Squad Leader talk | Both ears, chirp first |
 
-**FTL seats:** fireteams stay in Discord. Each Discord "Fireteam N" channel
-gets one FTL seat on Dad Net. Anyone Private+ in that channel can click
+**FTL seats:** fireteams stay in Discord. Every team channel in Discord gets one
+FTL seat: any voice channel in The Rally Point's category (Horton's op-night
+channels like "⚔️ Assault 1", Alpha Squad...) except The Rally Point and the
+AFK channel, plus anything named "Fireteam 2" or "FT2". Anyone Private+ in that channel can click
 **Take FTL**; it puts them on Command in Talk mode. Tonight's Squad Leader and
 S3 can assign, change or clear seats. A seat frees itself about a minute after
 its FTL leaves that Discord channel (or Dad Net), and all seats reset each op

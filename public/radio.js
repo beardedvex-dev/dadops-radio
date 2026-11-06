@@ -710,7 +710,7 @@ function renderSeats() {
       const holder = st.holder ? `<b>${mine ? "You" : esc(st.holder.callsign)}</b>${st.holder.away ? ' <span class="muted">(away)</span>' : ""}` : '<span class="muted">open</span>';
       return `<div class="ft${mine ? " mine" : ""}${here ? " here" : ""}${talking ? " live" : ""}"><span class="fttag">${esc(st.tag)}</span>` +
         `<div class="grow"><div class="ftname">${esc(st.name)} · ${st.count} on Dad Net${here ? " · you're here" : ""}</div><div class="ftl">FTL: ${holder}</div></div>${act}${pick}</div>`;
-    }).join("") + (seats.length ? "" : '<p class="muted ftnone">Nobody is in a Fireteam channel in Discord yet.</p>');
+    }).join("") + (seats.length ? "" : '<p class="muted ftnone">Nobody is in a team channel in Discord yet.</p>');
 }
 async function seatCmd(op, ch, conn) {
   try { const r = await ask({ t: "seat", op, ch, conn }); if (r.t === "error") flash(r.reason); } catch (e) { flash(e.message); }

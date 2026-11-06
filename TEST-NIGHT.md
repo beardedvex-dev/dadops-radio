@@ -8,7 +8,7 @@ Send them the radio address and this:
 
 > Open this in Chrome or Edge on your PC (or your phone), sign in with the
 > same Discord you use on dadops.gg, click **Get on net**, allow the mic,
-> then click **Join net** on Recon. If you're in a Fireteam channel in
+> then click **Join net** on Recon. If you're in a team channel in
 > Discord, click **Take FTL** to talk on Command.
 
 ## The checks
