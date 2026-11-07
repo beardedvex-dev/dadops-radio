@@ -28,6 +28,7 @@
     <p class="lead" id="signin-why" role="alert" hidden></p>
     <button id="signin" class="primary wide">Sign in with Discord</button>
     <p class="muted">Use the same Discord account you use on dadops.gg.</p>
+    <p class="muted">S3 can see who was on which net and when, for 90 days. Nothing anyone says is recorded.</p>
     <div class="box who">
       <div class="label">WHO GETS WHAT</div>
       <div class="row"><b>Private +</b><span>Recon, Air Support and Logistics. Listen in on Command, or take your fireteam's FTL seat to talk there. Listen to All-call.</span></div>
@@ -83,6 +84,22 @@
       <label class="vol">Boost <input type="range" id="mic-boost" min="50" max="300" step="10" aria-label="Mic boost"> <span id="mic-boost-val">100%</span></label>
       <div class="meter mic-meter" id="mic-meter" aria-hidden="true"></div>
       <div class="update-line"><span class="muted" id="mic-state">Click Radio check and say "radio check, one two". You'll hear it played back.</span><button class="join" id="mic-check">Radio check</button></div>
+    </details>
+    <details id="soundbox" class="box desk mic">
+      <summary class="label">RADIO SOUND</summary>
+      <p class="muted">How voices on Dad Net sound to you. Only on this computer: your own mic goes out as it is.</p>
+      <label class="miclbl" for="snd-preset">Radio filter</label>
+      <select id="snd-preset">
+        <option value="off">Off (plain voices)</option>
+        <option value="light">Light</option>
+        <option value="field">Field radio</option>
+        <option value="beat">Beat-up handset</option>
+      </select>
+      <label class="vol">Static <input type="range" id="snd-hiss" min="0" max="100" step="5" aria-label="Static under the voice"> <span id="snd-hiss-val">5%</span></label>
+      <label class="opt"><input type="checkbox" id="snd-click"> Open click (a small pop when someone starts talking)</label>
+      <label class="opt"><input type="checkbox" id="snd-roger"> Roger beep (a short tone when they let go)</label>
+      <label class="opt"><input type="checkbox" id="snd-tail"> Squelch tail (a burst of static when they let go)</label>
+      <div class="update-line"><button class="ghost small" id="snd-reset">Back to the defaults</button><span class="grow"></span><button class="join" id="snd-test">Hear it</button></div>
     </details>
     <details id="desk" class="box desk" hidden>
       <summary class="label">DESKTOP APP <span class="muted" id="app-version"></span></summary>

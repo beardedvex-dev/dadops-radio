@@ -44,6 +44,24 @@ const keyLabel = (k) => {
   return c.replace(/^Numpad/, "NUM ").replace(/(Left|Right)$/, " $1").toUpperCase();
 };
 
+// ---------- radio sound (v0.7): how voices coming in sound, kept in this browser ----------
+// Only what you hear changes; your own mic goes out as it is.
+//   preset  off | light | field | beat
+//   hiss    static under the voice, 0-100
+//   click   a small static pop as someone opens the channel
+//   roger   a short tone when they let go
+//   tail    the "kssht" burst after they let go
+const SOUND_DEFAULTS = { preset: "field", hiss: 5, click: true, roger: true, tail: false };
+const BANDS = {
+  light: { hp: 220, lp: 4200, peak: 1700, gain: 2, drive: 0.12 },
+  field: { hp: 350, lp: 3100, peak: 1600, gain: 4, drive: 0.35 },
+  beat:  { hp: 520, lp: 2400, peak: 1400, gain: 6, drive: 0.75 },
+};
+let sound = { ...SOUND_DEFAULTS };
+try { sound = { ...SOUND_DEFAULTS, ...JSON.parse(localStorage.getItem("dadops-radio-sound") || "{}") }; } catch {}
+if (sound.preset !== "off" && !BANDS[sound.preset]) sound.preset = SOUND_DEFAULTS.preset;
+const saveSound = () => { try { localStorage.setItem("dadops-radio-sound", JSON.stringify(sound)); } catch {} };
+
 // dadops.gg rank codes -> names (same ladder as the website)
 const RANKS = { recruit: "Recruit", pvt: "Private", pfc: "Private First Class", cpl: "Corporal", sgt: "Sergeant",
   sfc: "Sergeant First Class", "2lt": "Second Lieutenant", "1lt": "First Lieutenant", cpt: "Captain", maj: "Major",
@@ -149,8 +167,8 @@ function onMessage(m) {
     buildNets(); render(); netsScreen();
   }
   else if (m.t === "direct") { // someone's talking to you on the direct line (or stopped)
-    if (m.on) { R.incoming.set(m.from, m.callsign); R.lastCaller = m.from; chirp(1750, 0.06); }
-    else R.incoming.delete(m.from);
+    if (m.on) { R.incoming.set(m.from, m.callsign); R.lastCaller = m.from; chirp(1750, 0.06); squelchOpen(); }
+    else if (R.incoming.delete(m.from)) squelchClose();
     render();
   }
   else if (m.t === "mine") { // the switchboard moved us (an FTL seat taken or lost)
@@ -161,8 +179,12 @@ function onMessage(m) {
   }
   else if (m.t === "talking") {
     const p = R.roster.find((x) => x.conn === m.conn);
+    const was = p ? p.talking : null;
     if (p) p.talking = m.net;
-    if (m.net && m.conn !== R.conn && myNets().includes(m.net)) chirp(m.net === "allcall" ? 880 : 1320);
+    if (m.conn !== R.conn) {
+      if (m.net && myNets().includes(m.net)) { chirp(m.net === "allcall" ? 880 : 1320); if (was !== m.net) squelchOpen(); }
+      if (was && was !== m.net && myNets().includes(was)) squelchClose(); // they let go (or switched nets)
+    }
     render();
   }
 }
@@ -183,8 +205,9 @@ function teardown() {
   R.ws = null;
   try { R.pc && R.pc.close(); } catch {}
   R.pc = null;
-  for (const p of R.pipes.values()) { try { p.el.srcObject = null; p.src.disconnect(); } catch {} }
+  for (const p of R.pipes.values()) { try { p.el.srcObject = null; p.src.disconnect(); p.band.output.disconnect(); } catch {} }
   R.pipes.clear(); R.midToConn.clear(); R.pulled.clear();
+  if (R.hiss) R.hiss.gain.gain.value = 0;
   if (R.rawMic) R.rawMic.getTracks().forEach((t) => t.stop());
   try { R.micSrc && R.micSrc.disconnect(); R.micGain && R.micGain.disconnect(); } catch {}
   R.mic = null; R.micTrack = null; R.rawMic = null; R.micSrc = null; R.micGain = null; R.checkDest = null;
@@ -271,6 +294,30 @@ async function radioCheck() {
   }
   R.checking = false; btn.disabled = false;
 }
+
+// ---------- the Radio sound box ----------
+function soundSetup() {
+  const pick = $("snd-preset"), hiss = $("snd-hiss");
+  if (!pick) return;
+  pick.value = sound.preset;
+  hiss.value = sound.hiss; $("snd-hiss-val").textContent = `${sound.hiss}%`;
+  for (const k of ["click", "roger", "tail"]) $(`snd-${k}`).checked = !!sound[k];
+  const lock = () => { hiss.disabled = sound.preset === "off"; };
+  lock();
+  pick.onchange = () => { sound.preset = pick.value; saveSound(); lock(); for (const p of R.pipes.values()) wirePipe(p); mix(); };
+  hiss.oninput = () => { sound.hiss = +hiss.value; $("snd-hiss-val").textContent = `${hiss.value}%`; saveSound(); mix(); };
+  for (const k of ["click", "roger", "tail"]) $(`snd-${k}`).onchange = (e) => { sound[k] = e.target.checked; saveSound(); };
+  $("snd-test").onclick = () => {
+    if (!R.ctx) return;
+    R.ctx.resume();
+    chirp(1320); squelchOpen();
+    // A second of static at the slider's level stands in for a voice.
+    if (sound.preset !== "off" && sound.hiss) staticBurst(1.0, Math.max(0.04, (sound.hiss / 100) * HISS_MAX * 4), 0.06);
+    setTimeout(squelchClose, 1050);
+  };
+  $("snd-reset").onclick = () => { sound = { ...SOUND_DEFAULTS }; saveSound(); soundSetup(); for (const p of R.pipes.values()) wirePipe(p); mix(); };
+}
+soundSetup();
 
 // ---------- voice (Cloudflare Realtime) ----------
 // Every change to the connection runs one at a time.
@@ -366,28 +413,111 @@ function addPipe(conn, track) {
   const gain = R.ctx.createGain(); gain.gain.value = 0;
   const pan = R.ctx.createStereoPanner();
   const analyser = R.ctx.createAnalyser(); analyser.fftSize = 256;
-  src.connect(gain).connect(pan).connect(R.ctx.destination);
+  // voice -> radio band (or straight through, with the radio sound off) -> volume -> ear
+  const band = radioBand(sound.preset);
+  gain.connect(pan).connect(R.ctx.destination);
   gain.connect(analyser);
-  R.pipes.set(conn, { el, src, gain, pan, analyser });
+  const p = { el, src, band, gain, pan, analyser };
+  wirePipe(p);
+  R.pipes.set(conn, p);
   mix();
+}
+
+// ---------- the radio sound ----------
+// The "radio band": cut the bass and the highs, lift the middle a little,
+// add some grit, even the levels out. One per voice, on this computer only.
+function radioBand(preset) {
+  const c = R.ctx, b = BANDS[preset] || BANDS.field;
+  const f = (type, freq, q = 0.707, g = 0) => { const n = c.createBiquadFilter(); n.type = type; n.frequency.value = freq; n.Q.value = q; n.gain.value = g; return n; };
+  const hp1 = f("highpass", b.hp), hp2 = f("highpass", b.hp), pk = f("peaking", b.peak, 1, b.gain), lp1 = f("lowpass", b.lp), lp2 = f("lowpass", b.lp);
+  const grit = c.createWaveShaper(); grit.curve = gritCurve(b.drive); grit.oversample = "2x";
+  const comp = c.createDynamicsCompressor();
+  comp.threshold.value = -26; comp.ratio.value = 6; comp.attack.value = 0.003; comp.release.value = 0.15; comp.knee.value = 6;
+  const out = c.createGain(); out.gain.value = 1.5;
+  hp1.connect(hp2).connect(pk).connect(lp1).connect(lp2).connect(grit).connect(comp).connect(out);
+  return { input: hp1, output: out, preset };
+}
+function gritCurve(drive) {
+  const k = drive * 40, n = 2048, curve = new Float32Array(n);
+  for (let i = 0; i < n; i++) { const x = (i * 2) / n - 1; curve[i] = ((1 + k) * x) / (1 + k * Math.abs(x)); }
+  return curve;
+}
+// Connect a voice the way the radio sound is set right now.
+function wirePipe(p) {
+  try { p.src.disconnect(); } catch {}
+  try { p.band.output.disconnect(); } catch {}
+  if (sound.preset === "off") { p.src.connect(p.gain); return; }
+  if (p.band.preset !== sound.preset) p.band = radioBand(sound.preset);
+  p.src.connect(p.band.input); p.band.output.connect(p.gain);
+}
+// A loop of static, shared by everyone, that only plays under a voice you can hear.
+function noiseBuffer() {
+  if (R.noiseBuf) return R.noiseBuf;
+  const b = R.ctx.createBuffer(1, R.ctx.sampleRate * 2, R.ctx.sampleRate), d = b.getChannelData(0);
+  for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+  return (R.noiseBuf = b);
+}
+function hissOn() {
+  if (R.hiss || !R.ctx) return;
+  const src = R.ctx.createBufferSource(); src.buffer = noiseBuffer(); src.loop = true;
+  const bp = R.ctx.createBiquadFilter(); bp.type = "bandpass"; bp.frequency.value = 1050; bp.Q.value = 0.5;
+  const gain = R.ctx.createGain(); gain.gain.value = 0;
+  src.connect(bp).connect(gain).connect(R.ctx.destination); src.start();
+  R.hiss = { src, bp, gain };
+}
+const HISS_MAX = 0.05; // the slider's 100
+// A short burst of static through the radio band: the open click and the squelch tail.
+function staticBurst(len, level, at = 0) {
+  if (!R.ctx) return;
+  const c = R.ctx, t = c.currentTime + at;
+  const src = c.createBufferSource(); src.buffer = noiseBuffer();
+  const band = radioBand(sound.preset === "off" ? "field" : sound.preset);
+  const g = c.createGain(); g.gain.setValueAtTime(0, t);
+  if (len < 0.05) { g.gain.linearRampToValueAtTime(level, t + 0.003); g.gain.exponentialRampToValueAtTime(0.002, t + len); }
+  else { g.gain.linearRampToValueAtTime(level, t + 0.006); g.gain.setValueAtTime(level * 0.95, t + len - 0.05); g.gain.exponentialRampToValueAtTime(0.002, t + len); }
+  src.connect(g).connect(band.input); band.output.connect(c.destination);
+  src.start(t, Math.random()); src.stop(t + len + 0.05);
+  src.onended = () => { try { band.output.disconnect(); } catch {} };
+}
+function tone(freq, len, level, at = 0) {
+  if (!R.ctx) return;
+  const c = R.ctx, t = c.currentTime + at, o = c.createOscillator(), g = c.createGain();
+  o.type = "sine"; o.frequency.value = freq;
+  g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(level, t + 0.004);
+  g.gain.setValueAtTime(level, t + len - 0.008); g.gain.linearRampToValueAtTime(0, t + len);
+  o.connect(g).connect(c.destination); o.start(t); o.stop(t + len + 0.02);
+}
+// Someone you can hear opened up / let go.
+function squelchOpen() { if (sound.click) staticBurst(0.03, 0.3, 0.02); }
+function squelchClose() {
+  // A moment's wait: their last word is still on its way.
+  let at = 0.12;
+  if (sound.roger) { tone(1050, 0.09, 0.12, at); at += 0.11; }
+  if (sound.tail) staticBurst(0.22, 0.28, at);
 }
 
 // Who you hear: only people talking on a net you're on, in that net's ear and volume.
 function mix() {
   const mine = myNets();
+  let heard = false;
   for (const [conn, p] of R.pipes) {
     const who = R.roster.find((x) => x.conn === conn);
     const t = R.ctx.currentTime;
     if (R.incoming.has(conn)) { // talking to you on the direct line
       p.gain.gain.setTargetAtTime(S("direct").vol / 100, t, 0.015);
       p.pan.pan.setTargetAtTime(S("direct").pan || 0, t, 0.01);
+      heard = true;
       continue;
     }
     const net = who && who.talking;
     const on = net && mine.includes(net);
     p.gain.gain.setTargetAtTime(on ? S(net).vol / 100 : 0, t, 0.015);
-    if (on) p.pan.pan.setTargetAtTime(S(net).pan, t, 0.01);
+    if (on) { p.pan.pan.setTargetAtTime(S(net).pan, t, 0.01); heard = true; }
   }
+  // Static under the voice, only while there's a voice to hear.
+  const hiss = heard && sound.preset !== "off" ? (sound.hiss / 100) * HISS_MAX : 0;
+  if (hiss) hissOn();
+  if (R.hiss) R.hiss.gain.gain.setTargetAtTime(hiss, R.ctx.currentTime, 0.02);
   duckDiscord();
 }
 // Turn Discord down (desktop app v0.6+): while someone's talking to you, or while anyone is (you too).

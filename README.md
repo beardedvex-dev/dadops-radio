@@ -91,6 +91,22 @@ last. Private and up can start a call; anyone on Dad Net can be called. Only
 the person called hears it on their radio. (Everyone's app receives everyone's
 voice and plays only what's meant for it, so it isn't encrypted end to end.)
 
+**Radio sound (v0.7):** voices coming in go through a "radio band" on each
+listener's own computer (bass and highs cut, a little grit, levels evened
+out), with optional static under the voice and squelch sounds: an open click,
+a roger beep and a squelch tail. The **Radio sound** box on the radio picks
+Off, Light, Field radio (the default) or Beat-up handset. It's all in
+`public/radio.js` (`radioBand`, `squelchOpen`, `squelchClose`), so it ships
+with the next Cloudflare deploy: the desktop app doesn't need rebuilding.
+
+**Net log and Dad Net hours (v0.7):** the report to dadops.gg (see `DADNET_KEY`
+below) also lists who's on which net (Talk or Listen), each person's seat on
+Command, whether they're in Dad Ops Discord voice (not Kids Woke Up), and
+direct calls (only that one happened, once per pair every 5 minutes).
+dadops.gg turns that into the S3 Desk's **Dad Net log** (kept 90 days) and
+**Dad Net hours**, with milestone shout-outs (140-dad-net-log-hours.sql in the
+website repo). Nothing anyone says is ever sent.
+
 **Turn Discord down (app v0.6, Windows):** lowers Discord's slider in the
 Windows Volume Mixer while the radio talks to you (or while anyone talks,
 you too), to a level you pick or muted, then puts it back. `desktop/duck.ps1`

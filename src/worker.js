@@ -23,7 +23,9 @@
 //                                networks that block voice (see SETUP.md)
 //    DADNET_KEY                  (secret, optional) shared with dadops.gg (Vercel), so
 //                                Dad Net can tell the website who's on Command and
-//                                which teams have an FTL (Horton's posts, the op card)
+//                                which teams have an FTL (Horton's posts, the op card),
+//                                plus who's on which net, for the S3's net log and
+//                                Dad Net hours (140 on the website)
 //    DADNET_REPORT_URL           optional, defaults to https://dadops.gg/api/discord-sync
 //    SFU_BASE, DISCORD_API, TURN_BASE  optional, only changed for local tests
 // =====================================================================
@@ -521,7 +523,43 @@ export class Radio {
     const order = (p) => (p.role === "SL" ? 0 : /FTL$/.test(p.role || "") ? 1 : p.role === "S3" ? 2 : 3);
     const command = [...people.values()].sort((x, y) => order(x) - order(y) || String(x.role || "").localeCompare(String(y.role || ""), "en", { numeric: true }) || x.callsign.localeCompare(y.callsign));
     const seats = this.seatsView().map((v) => ({ tag: v.tag, name: v.name, ftl: v.holder ? v.holder.callsign : null, away: !!(v.holder && v.holder.away), count: v.count }));
-    return { on_net: onNet.size, listening: listening.size, command, seats };
+    return { on_net: onNet.size, listening: listening.size, command, seats, people: this.peopleState(), calls: (this.calls || []).slice(0, 50) };
+  }
+  // For the S3's net log and Dad Net hours (140 on the website): everyone on
+  // Dad Net, the nets they're on (talk or listen), their seat on Command, and
+  // whether they're in a Dad Ops Discord voice channel (not Kids Woke Up),
+  // which is when their time counts. Website account IDs only, nothing said.
+  peopleState() {
+    const nets = this.nets(), tagOf = (ch) => voiceTag(this.chanNames && this.chanNames.get(ch));
+    const byId = new Map();
+    for (const { a } of this.members()) {
+      const p = byId.get(a.me.id) || { id: a.me.id, nets: {}, role: null, counting: false };
+      for (const n of a.nets || []) {
+        const mode = (a.monitor || []).includes(n) ? "listen" : "talk";
+        if (p.nets[n] !== "talk") p.nets[n] = mode; // two windows open: talk wins
+      }
+      const seat = this.seatOf(a.me.id);
+      p.role = p.role || (seat ? `${tagOf(seat)} FTL` : a.me.squadLeader ? "SL" : a.me.staff ? "S3" : null);
+      const v = a.voice;
+      if (v && v.id && v.id !== this.afkId && !/kids\s*woke|\bafk\b/i.test(v.name || "")) p.counting = true;
+      byId.set(a.me.id, p);
+    }
+    return [...byId.values()].map((p) => ({
+      id: p.id, role: p.role, counting: p.counting,
+      nets: Object.entries(p.nets).map(([net, mode]) => ({ net, name: (nets[net] && nets[net].name) || net, mode })),
+    }));
+  }
+  // A direct call started: noted once per pair every 5 minutes, sent with the next report.
+  noteCall(fromId, toId) {
+    const key = `${fromId}>${toId}`, now = Date.now();
+    this.lastCall ||= new Map();
+    if (now - (this.lastCall.get(key) || 0) < 5 * 60e3) return;
+    this.lastCall.set(key, now);
+    for (const [k, at] of this.lastCall) if (now - at > 5 * 60e3) this.lastCall.delete(k);
+    this.calls ||= [];
+    this.calls.push({ from: fromId, to: toId, at: new Date(now).toISOString() });
+    if (this.calls.length > 50) this.calls.shift();
+    this.noteChange();
   }
   noteChange() { this.reportDirty = true; this.ctx.waitUntil(this.flushReport().catch(() => {})); }
   // Sent when something changed (at most every 5 seconds) and every 4 minutes
@@ -535,14 +573,15 @@ export class Radio {
       if (!at || at > now + 6000) await this.ctx.storage.setAlarm(now + 6000);
       return;
     }
-    const body = JSON.stringify({ dadnet: this.reportState() });
+    const state = this.reportState(), sentCalls = state.calls.length;
+    const body = JSON.stringify({ dadnet: state });
     this.reportDirty = false;
     if (body === this.lastReportBody && since < 240e3) return;
     this.lastReportAt = now;
     const url = this.env.DADNET_REPORT_URL || "https://dadops.gg/api/discord-sync";
     try {
       const r = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json", "x-dadnet-key": this.env.DADNET_KEY, "User-Agent": "Dad Net (dadops.gg, 1.0)" }, body });
-      if (r.ok) this.lastReportBody = body;
+      if (r.ok) { this.lastReportBody = body; if (this.calls) this.calls.splice(0, sentCalls); }
       else if (r.status !== 401 && r.status !== 403) this.reportDirty = true; // a wrong key waits for the 4-minute try
     } catch { this.reportDirty = true; }
   }
@@ -613,6 +652,7 @@ export class Radio {
         a.direct = to.a.conn;
         ws.serializeAttachment(a);
         this.send(to.ws, { t: "direct", from: a.conn, callsign: a.me.callsign, on: true });
+        this.noteCall(a.me.id, to.a.me.id); // the S3's net log: that a call happened, nothing more
         return;
       }
       if (msg.t === "talk") {
