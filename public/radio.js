@@ -126,12 +126,13 @@ async function connect() {
   }
   R.refreshed = false;
   if (w.t !== "welcome") throw new Error(w.reason || "Couldn't get on net.");
-  R.me = w.me; R.can = w.can; R.conn = w.conn; R.nets = w.nets; R.roster = w.roster; R.seats = w.seats || []; R.retry = 0;
+  R.me = w.me; R.can = w.can; R.conn = w.conn; R.nets = w.nets; R.roster = w.roster; R.seats = w.seats || [];
   buildNets();
   show("v-net");
   setStatus("Connecting voice", "");
   await startVoice();
   setStatus("On net", "on");
+  R.retry = 0; // only once voice works, so a broken connection backs off instead of retrying every 2 seconds
   render();
   $("goonnet").disabled = false;
 }

@@ -26,5 +26,6 @@
     "SUPABASE_KEY": "sb_publishable_A7CX1xAK1li3dZb6mVHiBQ__RD_mdEI"
   },
 
-  "observability": { "enabled": true }
+  // Logs: keep a random 10% so the free daily log allowance lasts.
+  "observability": { "enabled": true, "head_sampling_rate": 0.1 }
 }
